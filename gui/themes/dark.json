@@ -1,0 +1,23 @@
+{
+    "name": "Dark",
+
+    "background": "#171717",
+
+    "sidebar": "#1E1E1E",
+
+    "card": "#252525",
+
+    "border": "#333333",
+
+    "primary": "#3B82F6",
+
+    "success": "#22C55E",
+
+    "warning": "#F59E0B",
+
+    "danger": "#EF4444",
+
+    "text": "#FFFFFF",
+
+    "secondary_text": "#A1A1AA"
+}

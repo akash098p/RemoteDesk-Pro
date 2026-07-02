@@ -1,0 +1,23 @@
+{
+    "name": "Light",
+
+    "background": "#F8F9FA",
+
+    "sidebar": "#FFFFFF",
+
+    "card": "#FFFFFF",
+
+    "border": "#D1D5DB",
+
+    "primary": "#2563EB",
+
+    "success": "#16A34A",
+
+    "warning": "#F59E0B",
+
+    "danger": "#DC2626",
+
+    "text": "#111827",
+
+    "secondary_text": "#6B7280"
+}
