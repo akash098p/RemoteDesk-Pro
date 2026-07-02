@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+
+# Build Files
+build/
+dist/
+*.spec
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Logs
+logs/
+
+# Cache
+cache/
+
+# Temp
+temp/
+
+# Downloads
+downloads/
+
+# OS Files
+Thumbs.db
+.DS_Store

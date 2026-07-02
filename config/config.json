@@ -1,0 +1,11 @@
+{
+    "app_name": "RemoteDesk Pro",
+    "version": "1.0.0",
+    "theme": "dark",
+    "accent": "blue",
+    "language": "English",
+    "fps": 30,
+    "quality": "high",
+    "notifications": true,
+    "download_folder": "downloads"
+}
