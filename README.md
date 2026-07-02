@@ -260,7 +260,7 @@ RemoteDesk-Pro/
 Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/RemoteDesk-Pro.git
+git clone https://github.com/akash098p/RemoteDesk-Pro.git
 ```
 
 Open the project
@@ -345,14 +345,16 @@ This project is licensed under the MIT License.
 
 **Akash Pramanik**
 
-GitHub:
-https://github.com/YOUR_USERNAME
+<p>
+  <strong>For questions or support: </strong>
+<a href="https://instagram.com/akash.098p" target="_blank">
+  <img src="https://img.shields.io/badge/akash.098p-E4405F?style=flat&logo=instagram&logoColor=white"/>
+</a> 
 
-LinkedIn:
-https://linkedin.com/in/YOUR_PROFILE
-
-Instagram:
-https://instagram.com/YOUR_USERNAME
+<a href="mailto:akashpramanik098@gmail.com">
+  <img src="https://img.shields.io/badge/akashpramanik422%40gmail.com-D14836?style=flat&logo=gmail&logoColor=white"/>
+</a>
+</p>
 
 ---
 
@@ -369,11 +371,3 @@ If you like this project,
 🤝 Contribute
 
 ---
-
-<div align="center">
-
-### ❤️ Built with Python & CustomTkinter
-
-**RemoteDesk Pro © 2026**
-
-</div>
