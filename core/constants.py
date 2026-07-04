@@ -1,141 +1,328 @@
 """
-RemoteDesk Pro
-File: core/constants.py
+RemoteDesk Pro - Application Constants (Phase 2)
 
-Central application constants for Phase 2.
+This module defines all hardcoded constants used throughout the application.
+Including paths, dimensions, colors, versions, and default values.
+
+Author: Akash Pramanik
+Version: 1.0.0
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from typing import Dict, Tuple
 
-# -----------------------------------------------------------------------------
-# Application Information
-# -----------------------------------------------------------------------------
+# ============================================================================
+# APPLICATION INFORMATION
+# ============================================================================
 
-APP_NAME = "RemoteDesk Pro"
-APP_VERSION = "0.2.0"
-APP_AUTHOR = "Akash Pramanik"
-APP_DESCRIPTION = "Professional Cross-Platform Remote Collaboration Platform"
-APP_LICENSE = "MIT"
+APP_NAME: str = "RemoteDesk Pro"
+APP_VERSION: str = "1.0.0"
+APP_AUTHOR: str = "Akash Pramanik"
+APP_DESCRIPTION: str = "A Modern Cross-Platform Remote Collaboration Platform"
+APP_COPYRIGHT: str = "© 2024 Akash Pramanik. All rights reserved."
+APP_GITHUB: str = "https://github.com/akash098p/RemoteDesk-Pro"
+APP_LICENSE: str = "MIT"
 
-# -----------------------------------------------------------------------------
-# Project Paths
-# -----------------------------------------------------------------------------
+# ============================================================================
+# WINDOW SETTINGS
+# ============================================================================
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+WINDOW_WIDTH: int = 1200
+WINDOW_HEIGHT: int = 800
+WINDOW_MIN_WIDTH: int = 800
+WINDOW_MIN_HEIGHT: int = 600
+WINDOW_RESIZABLE: bool = True
 
-ASSETS_DIR = ROOT_DIR / "assets"
-CONFIG_DIR = ROOT_DIR / "config"
-CORE_DIR = ROOT_DIR / "core"
-GUI_DIR = ROOT_DIR / "gui"
-NETWORK_DIR = ROOT_DIR / "network"
-STREAMING_DIR = ROOT_DIR / "streaming"
-REMOTE_CONTROL_DIR = ROOT_DIR / "remote_control"
-FILES_DIR = ROOT_DIR / "files"
-CHAT_DIR = ROOT_DIR / "chat"
-AUDIO_DIR = ROOT_DIR / "audio"
-CLIPBOARD_DIR = ROOT_DIR / "clipboard"
-STORAGE_DIR = ROOT_DIR / "storage"
+# Default window position (None = center screen)
+WINDOW_DEFAULT_X: int | None = None
+WINDOW_DEFAULT_Y: int | None = None
 
-CACHE_DIR = ROOT_DIR / "cache"
-TEMP_DIR = ROOT_DIR / "temp"
-LOGS_DIR = ROOT_DIR / "logs"
-DOWNLOADS_DIR = ROOT_DIR / "downloads"
-DOCS_DIR = ROOT_DIR / "docs"
-TESTS_DIR = ROOT_DIR / "tests"
+# ============================================================================
+# SIDEBAR SETTINGS
+# ============================================================================
 
-DOWNLOADS_RECEIVED_DIR = DOWNLOADS_DIR / "received"
-DOWNLOADS_EXPORTS_DIR = DOWNLOADS_DIR / "exports"
-DOWNLOADS_UPDATES_DIR = DOWNLOADS_DIR / "updates"
+SIDEBAR_WIDTH: int = 240
+SIDEBAR_COLLAPSED_WIDTH: int = 60
+SIDEBAR_ANIMATION_SPEED: int = 200  # milliseconds
 
-ICONS_DIR = ASSETS_DIR / "icons"
-IMAGES_DIR = ASSETS_DIR / "images"
-FONTS_DIR = ASSETS_DIR / "fonts"
-SOUNDS_DIR = ASSETS_DIR / "sounds"
-EMOJIS_DIR = ASSETS_DIR / "emojis"
+# ============================================================================
+# COMPONENT SIZES
+# ============================================================================
 
-GUI_COMPONENTS_DIR = GUI_DIR / "components"
-GUI_PAGES_DIR = GUI_DIR / "pages"
-GUI_THEMES_DIR = GUI_DIR / "themes"
+CORNER_RADIUS: int = 8
+PADDING: int = 12
+BUTTON_HEIGHT: int = 40
+BUTTON_WIDTH: int = 120
+ICON_SIZE: int = 24
+FONT_SIZE_BODY: int = 14
+FONT_SIZE_LABEL: int = 12
+FONT_SIZE_HEADER: int = 18
+FONT_SIZE_SUBHEADER: int = 16
+FONT_SIZE_LIGHT: int = 13
 
-# -----------------------------------------------------------------------------
-# Config Files
-# -----------------------------------------------------------------------------
+# ============================================================================
+# FILE PATHS
+# ============================================================================
 
-CONFIG_FILE = CONFIG_DIR / "config.json"
-SETTINGS_FILE = CONFIG_DIR / "settings.json"
-USERS_FILE = CONFIG_DIR / "users.json"
-SHORTCUTS_FILE = CONFIG_DIR / "shortcuts.json"
+# Get the project root directory
+PROJECT_ROOT: Path = Path(__file__).parent.parent
 
-# -----------------------------------------------------------------------------
-# Log Files
-# -----------------------------------------------------------------------------
+# Configuration paths
+CONFIG_DIR: Path = PROJECT_ROOT / "config"
+CONFIG_FILE: Path = CONFIG_DIR / "config.json"
+SETTINGS_FILE: Path = CONFIG_DIR / "settings.json"
+SHORTCUTS_FILE: Path = CONFIG_DIR / "shortcuts.json"
+USERS_FILE: Path = CONFIG_DIR / "users.json"
 
-APPLICATION_LOG_FILE = LOGS_DIR / "application.log"
-ERROR_LOG_FILE = LOGS_DIR / "error.log"
-DEBUG_LOG_FILE = LOGS_DIR / "debug.log"
+# Assets paths
+ASSETS_DIR: Path = PROJECT_ROOT / "assets"
+FONTS_DIR: Path = ASSETS_DIR / "fonts"
+ICONS_DIR: Path = ASSETS_DIR / "icons"
+IMAGES_DIR: Path = ASSETS_DIR / "images"
+SOUNDS_DIR: Path = ASSETS_DIR / "sounds"
+THEMES_DIR: Path = PROJECT_ROOT / "gui" / "themes"
 
-# -----------------------------------------------------------------------------
-# Window
-# -----------------------------------------------------------------------------
+# Logs paths
+LOGS_DIR: Path = PROJECT_ROOT / "logs"
+LOG_FILE: Path = LOGS_DIR / "remotedesk.log"
 
-WINDOW_WIDTH = 1400
-WINDOW_HEIGHT = 850
-MIN_WINDOW_WIDTH = 1100
-MIN_WINDOW_HEIGHT = 700
+# Cache and temp paths
+CACHE_DIR: Path = PROJECT_ROOT / "cache"
+TEMP_DIR: Path = PROJECT_ROOT / "temp"
+DOWNLOADS_DIR: Path = PROJECT_ROOT / "downloads"
 
-SIDEBAR_WIDTH = 250
-SIDEBAR_COLLAPSED_WIDTH = 70
-TOOLBAR_HEIGHT = 50
-STATUSBAR_HEIGHT = 28
+# ============================================================================
+# FONT PATHS
+# ============================================================================
 
-# -----------------------------------------------------------------------------
-# Themes
-# -----------------------------------------------------------------------------
+FONT_REGULAR: Path = FONTS_DIR / "Inter-Regular.ttf"
+FONT_MEDIUM: Path = FONTS_DIR / "Inter-Medium.ttf"
+FONT_BOLD: Path = FONTS_DIR / "Inter-Bold.ttf"
+FONT_SEMIBOLD: Path = FONTS_DIR / "Inter-SemiBold.ttf"
+FONT_LIGHT: Path = FONTS_DIR / "Inter-Light.ttf"
 
-DEFAULT_THEME = "dark"
+FONT_DISPLAY_REGULAR: Path = FONTS_DIR / "InterDisplay-Regular.ttf"
+FONT_DISPLAY_BOLD: Path = FONTS_DIR / "InterDisplay-Bold.ttf"
 
-SUPPORTED_THEMES = (
-    "dark",
-    "light",
-    "dracula",
-    "nord",
-    "amoled",
+# ============================================================================
+# DEFAULT THEME COLORS
+# ============================================================================
+
+DEFAULT_THEME: str = "dark"
+
+DARK_THEME_COLORS: Dict[str, str] = {
+    "primary": "#0084FF",
+    "secondary": "#1E1E1E",
+    "background": "#0D0D0D",
+    "surface": "#1A1A1A",
+    "surface_hover": "#252525",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A0A0A0",
+    "accent": "#FF6B35",
+    "success": "#4CAF50",
+    "warning": "#FFC107",
+    "error": "#F44336",
+    "border": "#333333",
+}
+
+LIGHT_THEME_COLORS: Dict[str, str] = {
+    "primary": "#0084FF",
+    "secondary": "#F5F5F5",
+    "background": "#FFFFFF",
+    "surface": "#F0F0F0",
+    "surface_hover": "#E8E8E8",
+    "text_primary": "#1A1A1A",
+    "text_secondary": "#666666",
+    "accent": "#FF6B35",
+    "success": "#4CAF50",
+    "warning": "#FFC107",
+    "error": "#F44336",
+    "border": "#CCCCCC",
+}
+
+# ============================================================================
+# ANIMATION SETTINGS
+# ============================================================================
+
+ANIMATION_DURATION: int = 300  # milliseconds
+FADE_IN_DURATION: int = 200
+FADE_OUT_DURATION: int = 150
+PAGE_TRANSITION_DURATION: int = 200
+
+# ============================================================================
+# LOGGING SETTINGS
+# ============================================================================
+
+LOG_FORMAT: str = "[%(asctime)s] [%(levelname)s] - %(message)s"
+LOG_FORMAT_CONSOLE: str = "[%(levelname)s] %(message)s"
+LOG_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
+LOG_LEVEL: str = "DEBUG"
+LOG_MAX_BYTES: int = 10485760  # 10 MB
+LOG_BACKUP_COUNT: int = 7
+LOG_BUFFER_SIZE: int = 500  # Max lines to keep in memory for GUI
+
+# ============================================================================
+# DASHBOARD SETTINGS
+# ============================================================================
+
+CPU_UPDATE_INTERVAL: int = 1000  # milliseconds
+RAM_UPDATE_INTERVAL: int = 1000
+STATUS_UPDATE_INTERVAL: int = 1000
+LOG_DISPLAY_MAX_LINES: int = 100
+
+# ============================================================================
+# NOTIFICATION SETTINGS
+# ============================================================================
+
+NOTIFICATION_DURATION: int = 3000  # milliseconds
+NOTIFICATION_POSITION: str = "top-right"  # top-right, top-left, bottom-right, bottom-left
+NOTIFICATION_MAX_STACK: int = 5
+
+# ============================================================================
+# STATUS BAR SETTINGS
+# ============================================================================
+
+STATUS_BAR_HEIGHT: int = 30
+STATUS_UPDATE_FREQUENCY: int = 1000  # milliseconds
+
+# ============================================================================
+# ICON MAPPINGS
+# ============================================================================
+
+ICONS: Dict[str, str] = {
+    "dashboard": "dashboard.svg",
+    "connection": "plug-zap.svg",
+    "audio": "audio.svg",
+    "screen": "monitor.svg",
+    "chat": "chat.svg",
+    "files": "folder.svg",
+    "clipboard": "clipboard.svg",
+    "settings": "settings.svg",
+    "logs": "file-text.svg",
+    "about": "info.svg",
+    "notifications": "bell.svg",
+    "theme": "moon-star.svg",
+    "search": "search.svg",
+    "download": "download.svg",
+    "upload": "upload.svg",
+    "refresh": "refresh-cw.svg",
+    "close": "close.svg",
+    "maximize": "maximize.svg",
+    "minimize": "minimize.svg",
+    "wifi": "wifi.svg",
+    "user": "user-round.svg",
+}
+
+# ============================================================================
+# PAGE NAMES
+# ============================================================================
+
+PAGE_DASHBOARD: str = "dashboard"
+PAGE_CONNECTION: str = "connection"
+PAGE_AUDIO: str = "audio"
+PAGE_SCREEN: str = "screen"
+PAGE_CHAT: str = "chat"
+PAGE_FILES: str = "files"
+PAGE_CLIPBOARD: str = "clipboard"
+PAGE_SETTINGS: str = "settings"
+PAGE_LOGS: str = "logs"
+PAGE_ABOUT: str = "about"
+
+PAGES_ORDER: Tuple[str, ...] = (
+    PAGE_DASHBOARD,
+    PAGE_CONNECTION,
+    PAGE_AUDIO,
+    PAGE_SCREEN,
+    PAGE_CHAT,
+    PAGE_FILES,
+    PAGE_CLIPBOARD,
+    PAGE_SETTINGS,
+    PAGE_LOGS,
+    PAGE_ABOUT,
 )
 
-# -----------------------------------------------------------------------------
-# Logging
-# -----------------------------------------------------------------------------
+# ============================================================================
+# KEYBOARD SHORTCUTS
+# ============================================================================
 
-LOG_LEVEL = "INFO"
-LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-MAX_LOG_FILE_SIZE = 5 * 1024 * 1024
-BACKUP_LOG_COUNT = 5
+SHORTCUTS: Dict[str, str] = {
+    "open_settings": "Ctrl+,",
+    "open_dashboard": "Ctrl+Home",
+    "open_logs": "Ctrl+L",
+    "toggle_theme": "Ctrl+T",
+    "minimize": "Ctrl+M",
+    "maximize": "Ctrl+W",
+    "quit": "Ctrl+Q",
+}
 
-# -----------------------------------------------------------------------------
-# Refresh Intervals (ms)
-# -----------------------------------------------------------------------------
+# ============================================================================
+# NETWORK SETTINGS (For Phase 3)
+# ============================================================================
 
-CPU_REFRESH_INTERVAL = 1000
-RAM_REFRESH_INTERVAL = 1000
-NOTIFICATION_DURATION = 3500
+DEFAULT_HOST: str = "127.0.0.1"
+DEFAULT_PORT: int = 5000
+SOCKET_TIMEOUT: int = 10
+HEARTBEAT_INTERVAL: int = 30  # seconds
+HEARTBEAT_TIMEOUT: int = 60  # seconds
 
-# -----------------------------------------------------------------------------
-# Misc
-# -----------------------------------------------------------------------------
+# ============================================================================
+# STREAMING SETTINGS (For Phase 3)
+# ============================================================================
 
-UTF8 = "utf-8"
-JSON_INDENT = 4
-JSON_SORT_KEYS = False
+DEFAULT_FPS: int = 30
+DEFAULT_QUALITY: int = 75
+MAX_FPS: int = 60
+MIN_FPS: int = 5
+MAX_QUALITY: int = 100
+MIN_QUALITY: int = 20
 
-REQUIRED_DIRECTORIES = (
-    CACHE_DIR,
-    TEMP_DIR,
-    LOGS_DIR,
-    DOWNLOADS_DIR,
-    DOWNLOADS_RECEIVED_DIR,
-    DOWNLOADS_EXPORTS_DIR,
-    DOWNLOADS_UPDATES_DIR,
-)
+# ============================================================================
+# CACHE SETTINGS
+# ============================================================================
+
+CACHE_ICON_SIZE: Tuple[int, int] = (24, 24)
+CACHE_THUMBNAIL_SIZE: Tuple[int, int] = (150, 150)
+
+# ============================================================================
+# ENVIRONMENT CHECKS
+# ============================================================================
+
+# Check if running from PyInstaller bundle
+IS_FROZEN: bool = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
+# Platform detection
+PLATFORM: str = sys.platform
+IS_WINDOWS: bool = sys.platform == "win32"
+IS_LINUX: bool = sys.platform == "linux"
+IS_MACOS: bool = sys.platform == "darwin"
+
+# ============================================================================
+# UTILITY FUNCTION
+# ============================================================================
+
+
+def ensure_directories() -> None:
+    """
+    Create all required directories if they don't exist.
+    Called during application startup.
+    
+    Ensures the following directories are created:
+    - CONFIG_DIR: Configuration files
+    - LOGS_DIR: Log files
+    - CACHE_DIR: Cache storage
+    - TEMP_DIR: Temporary files
+    - DOWNLOADS_DIR: Downloaded files
+    """
+    directories = [
+        CONFIG_DIR,
+        LOGS_DIR,
+        CACHE_DIR,
+        TEMP_DIR,
+        DOWNLOADS_DIR,
+    ]
+
+    for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)
