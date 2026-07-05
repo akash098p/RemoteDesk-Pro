@@ -101,3 +101,77 @@ class LogsPage(ctk.CTkFrame):
     def clear_view(self) -> None:
         """Clear only the viewer contents."""
         self.textbox.delete("1.0", "end")
+"""
+===============================================================================
+RemoteDesk Pro
+File: gui/pages/logs.py
+Logs page displaying application, connection, and transfer logs.
+===============================================================================
+"""
+
+from __future__ import annotations
+
+import customtkinter
+import tkinter.scrolledtext as scrolledtext
+from core.config_manager import get_config_manager
+
+config_manager = get_config_manager()
+
+class LogsPage(customtkinter.CTkFrame):
+    """Page displaying system and application logs."""
+    
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent, fg_color="transparent")
+        self.parent = parent
+        
+        # Create UI
+        self._create_widgets()
+        
+    def _create_widgets(self) -> None:
+        # Header
+        title_label = customtkinter.CTkLabel(
+            self, text="Logs", font=customtkinter.CTkFont(size=16, weight="bold")
+        )
+        title_label.pack(pady=20)
+        
+        # Log display area
+        self.log_area = scrolledtext.ScrolledText(
+            self,
+            wrap=tkinter.WORD,
+            font=customtkinter.CTkFont(family="Inter", size=12)
+        )
+        self.log_area.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Filter section
+        filter_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        filter_frame.pack(fill="x", pady=10)
+        
+        filter_label = customtkinter.CTkLabel(
+            filter_frame, text="Filter by level:",
+            font=customtkinter.CTkFont(size=14)
+        )
+        filter_label.pack(side="left", padx=(0, 10))
+        
+        self.filter_var = customtkinter.StringVar(value="INFO")
+        filter_menu = customtkinter.CTkOptionMenu(
+            filter_frame,
+            variable=self.filter_var,
+            values=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        )
+        filter_menu.pack(side="left")
+        
+        # Clear button
+        clear_btn = customtkinter.CTkButton(
+            self,
+            text="Clear Logs",
+            command=self._clear_logs
+        )
+        clear_btn.pack(pady=10)
+        
+    def _clear_logs(self) -> None:
+        self.log_area.delete("1.0", "end")
+        
+    def _update_logs(self, new_logs: str) -> None:
+        """Placeholder to update logs from logging system"""
+        self.log_area.insert("end", new_logs + "\n")
+        self.log_area.see("end")

@@ -3,118 +3,263 @@
 RemoteDesk Pro
 File: gui/components/buttons.py
 
-Reusable button components built on CustomTkinter.
+Defines various reusable button widgets for the application, ensuring
+consistent styling and theme integration.
 ===============================================================================
 """
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Optional, Tuple, Union
 
-import customtkinter as ctk
+import customtkinter
 
+from core.constants import (
+    BUTTON_HEIGHT, BUTTON_WIDTH, CORNER_RADIUS, ICON_SIZE, PADDING,
+    FONT_SIZE_BODY
+)
+from core.theme_manager import get_theme_manager
+from core.utils import load_image
 
-class BaseButton(ctk.CTkButton):
-    """Base reusable button."""
+theme_manager = get_theme_manager()
 
+class BaseButton(customtkinter.CTkButton):
+    """
+    Base class for all custom buttons, providing common styling and theme integration.
+    """
     def __init__(
         self,
-        master,
+        master: Any,
         text: str = "",
-        command: Callable | None = None,
-        width: int = 140,
-        height: int = 40,
-        **kwargs,
+        command: Optional[Callable[..., Any]] = None,
+        width: int = BUTTON_WIDTH,
+        height: int = BUTTON_HEIGHT,
+        corner_radius: int = CORNER_RADIUS,
+        font_size: int = FONT_SIZE_BODY,
+        icon: Optional[Union[str, customtkinter.CTkImage]] = None,
+        **kwargs: Any,
     ) -> None:
+        
+        self._master = master
+        self._icon_name = icon if isinstance(icon, str) else None
+        self._icon_image = icon if isinstance(icon, customtkinter.CTkImage) else None
+
         super().__init__(
             master=master,
             text=text,
             command=command,
             width=width,
             height=height,
-            corner_radius=10,
-            font=("Inter", 13),
+            corner_radius=corner_radius,
+            font=theme_manager.get_font("Inter", font_size, "medium"),
             **kwargs,
         )
+        self._apply_theme_colors()
+        theme_manager.register_theme_change_callback(self._on_theme_change)
+        self._load_and_set_icon()
+
+    def _apply_theme_colors(self) -> None:
+        """
+        Applies theme-specific colors to the button.
+        To be overridden by subclasses for specific button types.
+        """
+        pass # Base class does not apply specific colors
+
+    def _on_theme_change(self, theme_name: str) -> None:
+        """
+        Callback for when the theme changes. Re-applies theme colors.
+        """
+        self._apply_theme_colors()
+        # Reload icon as its colors might change with theme
+        self._load_and_set_icon()
+
+    def _load_and_set_icon(self) -> None:
+        """
+        Loads the icon image if an icon_name is provided and sets it to the button.
+        """
+        if self._icon_name:
+            self._icon_image = load_image(self._icon_name, size=(ICON_SIZE, ICON_SIZE))
+            if self._icon_image:
+                self.configure(image=self._icon_image, compound="left", padx=PADDING / 2)
+            else:
+                self.configure(image=None, compound="none", padx=0) # Clear image if loading failed
+        elif self._icon_image: # If a CTkImage was passed directly
+            self.configure(image=self._icon_image, compound="left", padx=PADDING / 2)
+        else:
+            self.configure(image=None, compound="none", padx=0)
+
+
+    def set_icon(self, icon: Optional[Union[str, customtkinter.CTkImage]]) -> None:
+        """
+        Sets or updates the icon of the button.
+        """
+        self._icon_name = icon if isinstance(icon, str) else None
+        self._icon_image = icon if isinstance(icon, customtkinter.CTkImage) else None
+        self._load_and_set_icon()
+
+    def destroy(self) -> None:
+        """
+        Destroys the widget and unregisters theme change callback.
+        """
+        theme_manager.unregister_theme_change_callback(self._on_theme_change)
+        super().destroy()
 
 
 class PrimaryButton(BaseButton):
-    """Primary action button."""
-
-    def __init__(self, master, **kwargs) -> None:
-        super().__init__(
-            master,
-            fg_color="#2563EB",
-            hover_color="#1D4ED8",
-            text_color="white",
-            **kwargs,
+    """
+    A prominent button for primary actions (e.g., "Connect", "Save").
+    """
+    def _apply_theme_colors(self) -> None:
+        self.configure(
+            fg_color=theme_manager.get_color("primary"),
+            hover_color=theme_manager.get_color("primary_hover", "primary"),
+            text_color=theme_manager.get_color("text_on_primary", "text_primary"),
         )
 
 
 class SecondaryButton(BaseButton):
-    """Secondary action button."""
-
-    def __init__(self, master, **kwargs) -> None:
-        super().__init__(
-            master,
-            fg_color="#374151",
-            hover_color="#4B5563",
-            text_color="white",
-            **kwargs,
-        )
-
-
-class SuccessButton(BaseButton):
-    """Success button."""
-
-    def __init__(self, master, **kwargs) -> None:
-        super().__init__(
-            master,
-            fg_color="#16A34A",
-            hover_color="#15803D",
-            text_color="white",
-            **kwargs,
+    """
+    A secondary button for less prominent actions (e.g., "Cancel", "Browse").
+    """
+    def _apply_theme_colors(self) -> None:
+        self.configure(
+            fg_color=theme_manager.get_color("secondary"),
+            hover_color=theme_manager.get_color("secondary_hover", "surface"),
+            text_color=theme_manager.get_color("text_primary"),
+            border_color=theme_manager.get_color("border"),
+            border_width=1,
         )
 
 
 class DangerButton(BaseButton):
-    """Danger button."""
-
-    def __init__(self, master, **kwargs) -> None:
-        super().__init__(
-            master,
-            fg_color="#DC2626",
-            hover_color="#B91C1C",
-            text_color="white",
-            **kwargs,
+    """
+    A button for destructive actions (e.g., "Delete", "Disconnect").
+    """
+    def _apply_theme_colors(self) -> None:
+        self.configure(
+            fg_color=theme_manager.get_color("error"),
+            hover_color=theme_manager.get_color("error_hover", "error"),
+            text_color=theme_manager.get_color("text_on_error", "text_primary"),
         )
 
 
 class SidebarButton(BaseButton):
-    """Navigation sidebar button."""
-
-    def __init__(self, master, **kwargs) -> None:
+    """
+    A button specifically designed for the collapsible sidebar navigation.
+    """
+    def __init__(
+        self,
+        master: Any,
+        text: str,
+        command: Optional[Callable[..., Any]] = None,
+        icon: Optional[Union[str, customtkinter.CTkImage]] = None,
+        is_active: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        self._is_active = is_active
         super().__init__(
-            master,
-            anchor="w",
-            height=46,
-            corner_radius=8,
-            fg_color="transparent",
-            hover_color="#2D3748",
-            text_color=("black", "white"),
-            border_width=0,
+            master=master,
+            text=text,
+            command=command,
+            width=BUTTON_WIDTH,
+            height=BUTTON_HEIGHT,
+            corner_radius=CORNER_RADIUS,
+            font_size=FONT_SIZE_BODY,
+            anchor="w", # Align text and icon to the left
+            padx=PADDING,
+            icon=icon,
             **kwargs,
         )
 
+    def _apply_theme_colors(self) -> None:
+        if self._is_active:
+            self.configure(
+                fg_color=theme_manager.get_color("sidebar_button_active_bg", "primary"),
+                hover_color=theme_manager.get_color("sidebar_button_active_hover_bg", "primary_hover"),
+                text_color=theme_manager.get_color("sidebar_button_active_text", "text_on_primary"),
+                image_property="text_color", # Icons also get active text color
+            )
+        else:
+            self.configure(
+                fg_color=theme_manager.get_color("sidebar_button_bg", "transparent"),
+                hover_color=theme_manager.get_color("sidebar_button_hover_bg", "surface_hover"),
+                text_color=theme_manager.get_color("sidebar_button_text", "text_primary"),
+                image_property="text_color",
+            )
+
+    def set_active(self, active: bool) -> None:
+        """
+        Sets the active state of the sidebar button.
+        """
+        if self._is_active != active:
+            self._is_active = active
+            self._apply_theme_colors()
+            logger.debug(f"Sidebar button '{self.cget("text")}' set to active: {active}")
+
 
 class IconButton(BaseButton):
-    """Square icon button."""
-
-    def __init__(self, master, **kwargs) -> None:
+    """
+    A button that displays only an icon, typically for toolbar or compact actions.
+    """
+    def __init__(
+        self,
+        master: Any,
+        command: Optional[Callable[..., Any]] = None,
+        icon: Optional[Union[str, customtkinter.CTkImage]] = None,
+        width: int = ICON_SIZE + PADDING,
+        height: int = ICON_SIZE + PADDING,
+        corner_radius: int = CORNER_RADIUS,
+        tooltip_text: str = "", # Future: Add tooltip functionality
+        **kwargs: Any,
+    ) -> None:
         super().__init__(
-            master,
-            text="",
-            width=38,
-            height=38,
-            corner_radius=8,
+            master=master,
+            text="", # Icon buttons typically have no text
+            command=command,
+            width=width,
+            height=height,
+            corner_radius=corner_radius,
+            icon=icon,
             **kwargs,
+        )
+        self._tooltip_text = tooltip_text
+        self.configure(compound="center") # Center the icon
+    
+    def _apply_theme_colors(self) -> None:
+        self.configure(
+            fg_color=theme_manager.get_color("icon_button_bg", "transparent"),
+            hover_color=theme_manager.get_color("icon_button_hover_bg", "surface_hover"),
+            text_color=theme_manager.get_color("icon_button_text", "text_primary"),
+            image_property="text_color",
+        )
+
+
+class CloseButton(IconButton):
+    """
+    A red icon button for closing actions.
+    """
+    def __init__(
+        self,
+        master: Any,
+        command: Optional[Callable[..., Any]] = None,
+        width: int = ICON_SIZE + PADDING,
+        height: int = ICON_SIZE + PADDING,
+        corner_radius: int = CORNER_RADIUS,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            master=master,
+            command=command,
+            icon="close.svg",
+            width=width,
+            height=height,
+            corner_radius=corner_radius,
+            **kwargs,
+        )
+
+    def _apply_theme_colors(self) -> None:
+        self.configure(
+            fg_color=theme_manager.get_color("close_button_bg", "transparent"),
+            hover_color=theme_manager.get_color("close_button_hover_bg", "error"),
+            text_color=theme_manager.get_color("close_button_text", "text_primary"),
+            image_property="text_color",
         )

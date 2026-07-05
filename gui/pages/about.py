@@ -2,79 +2,62 @@
 ===============================================================================
 RemoteDesk Pro
 File: gui/pages/about.py
-
-About page for RemoteDesk Pro.
+About page showing application information and credits.
 ===============================================================================
 """
+
 from __future__ import annotations
 
-import customtkinter as ctk
+import customtkinter
+from core.config_manager import get_config_manager
 
-from core.constants import (
-    APP_AUTHOR,
-    APP_COPYRIGHT,
-    APP_DESCRIPTION,
-    APP_LICENSE,
-    APP_NAME,
-    APP_REPOSITORY,
-    APP_VERSION,
-)
-from gui.components.cards import InfoCard
-from gui.components.widgets import PageHeader
+config_manager = get_config_manager()
 
-
-class AboutPage(ctk.CTkFrame):
-    """Displays application information."""
-
-    def __init__(self, master, **kwargs) -> None:
-        super().__init__(master, fg_color="transparent", **kwargs)
-
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
-
-        header = PageHeader(
+class AboutPage(customtkinter.CTkFrame):
+    """Page displaying application information."""
+    
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent, fg_color="transparent")
+        self.parent = parent
+        
+        # Create UI
+        self._create_widgets()
+        
+    def _create_widgets(self) -> None:
+        # Header
+        title_label = customtkinter.CTkLabel(
+            self, text="About RemoteDesk Pro", 
+            font=customtkinter.CTkFont(size=16, weight="bold")
+        )
+        title_label.pack(pady=20)
+        
+        # Application info
+        info_text = f"""
+RemoteDesk Pro v{config_manager.get_config('settings').get('app_version', '1.0.0')}
+A modern remote collaboration platform inspired by AnyDesk and TeamViewer.
+        
+Developer: Akash Pramanik
+GitHub: https://github.com/akash098p/RemoteDesk-Pro
+        
+License: MIT
+"""
+        
+        info_label = customtkinter.CTkLabel(
+            self, 
+            text=info_text,
+            font=customtkinter.CTkFont(family="Inter", size=14),
+            text_color=theme_manager.get_color("text_secondary", "#A0A0A0")
+        )
+        info_label.pack(padx=20, pady=(0, 20))
+        
+        # Back button
+        back_btn = customtkinter.CTkButton(
             self,
-            title="About",
-            subtitle="Application information",
+            text="Back",
+            command=self._back_to_dashboard
         )
-        header.grid(
-            row=0,
-            column=0,
-            sticky="ew",
-            padx=20,
-            pady=(20, 10),
-        )
-
-        content = (
-            f"Application : {APP_NAME}\n"
-            f"Version     : {APP_VERSION}\n"
-            f"Author      : {APP_AUTHOR}\n"
-            f"License     : {APP_LICENSE}\n\n"
-            f"{APP_DESCRIPTION}\n\n"
-            f"Repository:\n{APP_REPOSITORY}\n\n"
-            f"{APP_COPYRIGHT}"
-        )
-
-        card = InfoCard(
-            self,
-            title="RemoteDesk Pro",
-            content=content,
-        )
-        card.grid(
-            row=1,
-            column=0,
-            sticky="nsew",
-            padx=20,
-            pady=(0, 20),
-        )
-
-        footer = ctk.CTkLabel(
-            self,
-            text="Thank you for using RemoteDesk Pro.",
-            font=("Inter", 12),
-        )
-        footer.grid(
-            row=2,
-            column=0,
-            pady=(0, 20),
-        )
+        back_btn.pack(pady=20)
+        
+    def _back_to_dashboard(self) -> None:
+        if self.parent._navigation_manager:
+            self.parent._navigation_manager.show_page("dashboard")

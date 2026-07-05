@@ -2,57 +2,33 @@
 ===============================================================================
 RemoteDesk Pro
 File: app.py
-
-Application entry point.
+Entry point for the RemoteDesk Pro application.
+This file initializes the application with the configured settings.
 ===============================================================================
 """
-from __future__ import annotations
 
-import customtkinter as ctk
+import sys
+import os
+from tkinter import Tk
 
-from core.config_manager import ConfigManager
-from core.constants import DEFAULT_THEME
-from core.logger import Logger
-from core.theme_manager import ThemeManager
-from gui.main_window import MainWindow
-
-
-def bootstrap() -> None:
-    """Initialize application services."""
-    Logger.configure()
-
-    config = ConfigManager()
-
-    theme_name = config.config.get("theme", DEFAULT_THEME)
-
-    try:
-        ThemeManager().load_theme(theme_name)
-    except Exception:
-        Logger.get_logger(__name__).warning(
-            "Unable to load theme '%s'. Falling back to default.",
-            theme_name,
-        )
-        ThemeManager().load_theme(DEFAULT_THEME)
-
-    ctk.set_appearance_mode("Dark")
-    ctk.set_default_color_theme("blue")
-
+from core.config_manager import get_config_manager
+from gui.main_window import create_main_window
 
 def main() -> None:
-    """Start RemoteDesk Pro."""
-    bootstrap()
-
-    logger = Logger.get_logger(__name__)
-    logger.info("Starting RemoteDesk Pro...")
-
-    app = MainWindow()
-
-    logger.info("Main window initialized.")
-
+    # Set up configuration
+    config = get_config_manager()
+    config.load_all()  # Load any existing settings
+    
+    # Create main window
+    app = Tk()
+    app.title(f"{APP_NAME} v{APP_VERSION}")  # Need to store version in config
+    
+    # Create and run the main window
+    main_window = create_main_window(config)
+    main_window.run()
+    
+    # Keep the window running
     app.mainloop()
-
-    logger.info("Application closed.")
-
 
 if __name__ == "__main__":
     main()

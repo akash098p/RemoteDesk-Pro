@@ -165,6 +165,13 @@ LOG_BACKUP_COUNT: int = 7
 LOG_BUFFER_SIZE: int = 500  # Max lines to keep in memory for GUI
 
 # ============================================================================
+# JSON SETTINGS
+# ============================================================================
+
+JSON_INDENT: int = 4
+JSON_SORT_KEYS: bool = False
+
+# ============================================================================
 # DASHBOARD SETTINGS
 # ============================================================================
 
@@ -308,7 +315,7 @@ def ensure_directories() -> None:
     """
     Create all required directories if they don't exist.
     Called during application startup.
-    
+
     Ensures the following directories are created:
     - CONFIG_DIR: Configuration files
     - LOGS_DIR: Log files

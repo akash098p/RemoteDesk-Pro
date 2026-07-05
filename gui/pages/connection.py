@@ -2,105 +2,76 @@
 ===============================================================================
 RemoteDesk Pro
 File: gui/pages/connection.py
-
-Connection page (Phase 2 UI Foundation)
+Connection page for initiating and managing remote connections.
 ===============================================================================
 """
+
 from __future__ import annotations
 
-import customtkinter as ctk
+import customtkinter
+from core.theme_manager import get_theme_manager
+from core.utils import load_image
 
-from gui.components.buttons import PrimaryButton, SecondaryButton
-from gui.components.cards import InfoCard, PageCard
-from gui.components.widgets import LabeledEntry, PageHeader
+theme_manager = get_theme_manager()
 
-
-class ConnectionPage(ctk.CTkFrame):
-    """Connection management page."""
-
-    def __init__(self, master, **kwargs) -> None:
-        super().__init__(master, fg_color="transparent", **kwargs)
-
-        self.grid_columnconfigure((0, 1), weight=1)
-        self.grid_rowconfigure(1, weight=1)
-
-        header = PageHeader(
-            self,
-            title="Connection",
-            subtitle="Prepare remote sessions (Networking arrives in Phase 3)",
+class ConnectionPage(customtkinter.CTkFrame):
+    """Page for connection setup and status."""
+    
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent, fg_color="transparent")
+        self.parent = parent
+        self._theme = theme_manager
+        
+        # Create UI
+        self._create_widgets()
+        
+    def _create_widgets(self) -> None:
+        # Header
+        title_label = customtkinter.CTkLabel(
+            self, text="Connection", font=customtkinter.CTkFont(size=16, weight="bold")
         )
-        header.grid(row=0, column=0, columnspan=2,
-                    sticky="ew", padx=20, pady=(20, 10))
-
-        left = PageCard(self)
-        left.grid(row=1, column=0, sticky="nsew",
-                  padx=(20, 10), pady=(0, 20))
-        left.grid_columnconfigure(0, weight=1)
-
-        self.remote_id = LabeledEntry(
-            left,
-            label="Remote ID",
-            placeholder="Enter remote device ID",
+        title_label.pack(pady=20)
+        
+        # Connection status
+        status_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        status_frame.pack(fill="x", pady=10)
+        
+        status_label = customtkinter.CTkLabel(
+            status_frame, text="Status: Disconnected",
+            font=customtkinter.CTkFont(size=14, weight="bold")
         )
-        self.remote_id.grid(row=0, column=0, sticky="ew",
-                            padx=20, pady=(20, 12))
-
-        self.password = LabeledEntry(
-            left,
-            label="Password",
-            placeholder="Enter session password",
-            show="•",
+        status_label.pack(side="left", padx=(0, 10))
+        
+        # Connection controls
+        control_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        control_frame.pack(fill="x", pady=10)
+        
+        # IP input
+        ip_label = customtkinter.CTkLabel(
+            control_frame, text="Remote IP/ID:",
+            font=customtkinter.CTkFont(size=14)
         )
-        self.password.grid(row=1, column=0, sticky="ew",
-                           padx=20, pady=12)
-
-        btns = ctk.CTkFrame(left, fg_color="transparent")
-        btns.grid(row=2, column=0, sticky="e", padx=20, pady=20)
-
-        PrimaryButton(
-            btns,
+        ip_label.pack(side="left", padx=(0, 10))
+        
+        self.ip_entry = customtkinter.CTkEntry(control_frame)
+        self.ip_entry.pack(side="left", fill="x", expand=True)
+        
+        # Connect button
+        connect_btn = customtkinter.CTkButton(
+            control_frame,
             text="Connect",
-            width=120,
-            command=self.connect,
-        ).pack(side="left", padx=(0, 8))
-
-        SecondaryButton(
-            btns,
-            text="Clear",
-            width=120,
-            command=self.clear,
-        ).pack(side="left")
-
-        self.status = ctk.CTkLabel(
-            left,
-            text="Ready",
-            anchor="w",
-            font=("Inter", 11),
+            command=self._on_connect
         )
-        self.status.grid(row=3, column=0, sticky="ew",
-                         padx=20, pady=(0, 20))
-
-        right = InfoCard(
-            self,
-            title="Phase 2",
-            content=(
-                "This page provides the complete connection UI.\n\n"
-                "Networking, authentication, encrypted transport, "
-                "session negotiation and remote desktop streaming "
-                "will be implemented during Phase 3."
-            ),
-        )
-        right.grid(row=1, column=1, sticky="nsew",
-                   padx=(10, 20), pady=(0, 20))
-
-    def connect(self) -> None:
-        """Placeholder UI action for Phase 2."""
-        self.status.configure(
-            text=f"Prepared connection to: {self.remote_id.get() or 'Unknown'}"
-        )
-
-    def clear(self) -> None:
-        """Clear all fields."""
-        self.remote_id.clear()
-        self.password.clear()
-        self.status.configure(text="Ready")
+        connect_btn.pack(side="left", padx=(10, 0))
+        
+        # Terminal section (placeholder)
+        terminal_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        terminal_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        self.terminal = customtkinter.CTkTextbox(terminal_frame)
+        self.terminal.pack(fill="both", expand=True)
+        
+    def _on_connect(self) -> None:
+        """Placeholder for connection logic (Phase 3 will implement actual networking)"""
+        self.terminal.insert("end", "Connection initiated...\n")
+        # Would connect to the provided IP in Phase 3
