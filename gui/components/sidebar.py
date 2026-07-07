@@ -139,7 +139,8 @@ class Sidebar(customtkinter.CTkFrame):
                 hover_text=item["hover_text"],
                 icon_size=item["icon_size"]
             )
-            button._set_nav_key(item["key"])  # Set internal navigation key
+            # Set nav key as attribute (SidebarButton may not expose a private setter)
+            button._nav_key = item["key"]
             button.pack(fill="x", pady=2)
             self._buttons.append(button)
 
@@ -161,7 +162,7 @@ class Sidebar(customtkinter.CTkFrame):
     def _update_active_state(self, active_key: str) -> None:
         """Highlight the active navigation button."""
         for button in self._buttons:
-            is_active = button._nav_key == active_key
+            is_active = getattr(button, "_nav_key", None) == active_key
             button.set_active(is_active)
             # Force re-pack to update layout
             button.pack_forget()
