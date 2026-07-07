@@ -32,102 +32,6 @@ class SettingsPage(customtkinter.CTkFrame):
         # Create UI
         self._create_widgets()
             
-    def _create_widgets(self) -> None:
-        # Header
-        title_label = customtkinter.CTkLabel(
-            self, text="Settings", 
-            font=customtkinter.CTkFont(size=16, weight="bold")
-        )
-        title_label.pack(pady=20)
-        
-        # Theme Section
-        theme_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        theme_frame.pack(fill="x", pady=10)
-        
-        theme_label = customtkinter.CTkLabel(
-            theme_frame, text="Theme:",
-            font=customtkinter.CTkFont(size=14)
-        )
-        theme_label.pack(side="left", padx=(0, 10))
-        
-        self.theme_var = customtkinter.StringVar(value=self._settings.get("theme", "dark"))
-        self.theme_dropdown = customtkinter.CTkOptionMenu(
-            theme_frame, 
-            variable=self.theme_var,
-            values=["dark", "light", "nord", "dracula", "amoled"],
-            command=self._on_theme_change
-        )
-        self.theme_dropdown.pack(side="left")
-        
-        # Font Size Section
-        font_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        font_frame.pack(fill="x", pady=10)
-        
-        font_label = customtkinter.CTkLabel(
-            font_frame, text="Font Size:",
-            font=customtkinter.CTkFont(size=14)
-        )
-        font_label.pack(side="left", padx=(0, 10))
-        
-        self.font_var = customtkinter.IntVar(value=self._settings.get("font_size", 14))
-        self.font_spinbox = customtkinter.CTkSpinbox(
-            font_frame,
-            from_=10,
-            to=24,
-            command=self._on_font_change,
-            variable=self.font_var
-        )
-        self.font_spinbox.pack(side="left")
-        
-        # Quality & Frame Rate Section (new addition)
-        quality_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        quality_frame.pack(fill="x", pady=10)
-        
-        quality_label = customtkinter.CTkLabel(
-            quality_frame, text="Capture Quality:",
-            font=customtkinter.CTkFont(size=14)
-        )
-        quality_label.pack(side="left", padx=(0, 10))
-        
-        # Quality scale
-        self.quality_var = customtkinter.IntVar(value=self._settings.get("quality", 75))
-        self.quality_slider = customtkinter.CTkSlider(
-            quality_frame,
-            variable=self.quality_var,
-            from_=1,
-            to=100,
-            number_of_steps=100,
-            command=self._on_quality_change
-        )
-        self.quality_slider.pack(side="left", fill="x", expand=True)
-        
-        # Frame Rate Section
-        fps_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        fps_frame.pack(fill="x", pady=10)
-        
-        fps_label = customtkinter.CTkLabel(
-            fps_frame, text="Capture FPS:",
-            font=customtkinter.CTkFont(size=14)
-        )
-        fps_label.pack(side="left", padx=(0, 10))
-        
-        # Frame rate spinbox with preset options
-        fps_options = [15, 24, 30, 60]
-        self.fps_var = customtkinter.IntVar(value=self._settings.get("fps", 30))
-        self.fps_spinbox = customtkinter.CTkOptionMenu(
-            fps_frame,
-            variable=self.fps_var,
-            values=[str(fps) for fps in fps_options],
-            command=self._on_fps_change
-        )
-        self.fps_spinbox.pack(side="left")
-        
-        # Back Button
-        back_btn = customtkinter.CTkButton(
-            self, text="Back", command=self._back_to_dashboard
-        )
-        back_btn.pack(pady=20)
-        
     def _on_theme_change(self, new_theme: Optional[str] = None) -> None:
         if new_theme is None:
             new_theme = self.theme_var.get()
@@ -187,12 +91,11 @@ class SettingsPage(customtkinter.CTkFrame):
         )
         font_label.pack(side="left", padx=(0, 10))
         
-        self.font_var = customtkinter.IntVar(value=self._settings.get("font_size", 14))
-        self.font_spinbox = customtkinter.CTkSpinbox(
+        self.font_var = customtkinter.StringVar(value=str(self._settings.get("font_size", 14)))
+        self.font_spinbox = customtkinter.CTkOptionMenu(
             font_frame,
             variable=self.font_var,
-            from_=10,
-            to=24,
+            values=[str(size) for size in range(10, 25)],
             command=self._on_font_change,
         )
         self.font_spinbox.pack(side="left")

@@ -44,7 +44,7 @@ class LogsPage(ctk.CTkFrame):
         card.grid_rowconfigure(1, weight=1)
 
         toolbar = ctk.CTkFrame(card, fg_color="transparent")
-        toolbar.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 8))
+        toolbar.pack(fill="x", padx=16, pady=(16, 8))
 
         PrimaryButton(
             toolbar,
@@ -73,13 +73,7 @@ class LogsPage(ctk.CTkFrame):
             wrap="word",
             font=("Consolas", 12),
         )
-        self.textbox.grid(
-            row=1,
-            column=0,
-            sticky="nsew",
-            padx=16,
-            pady=(0, 16),
-        )
+        self.textbox.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
         # Initial load
         self.refresh_logs()

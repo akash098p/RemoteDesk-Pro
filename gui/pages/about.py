@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import customtkinter
 from core.config_manager import get_config_manager
+from core.theme_manager import get_theme_manager
 
+theme_manager = get_theme_manager()
 config_manager = get_config_manager()
 
 class AboutPage(customtkinter.CTkFrame):

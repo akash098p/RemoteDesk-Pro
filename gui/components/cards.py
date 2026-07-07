@@ -257,3 +257,10 @@ class SystemStatusCard(Card):
             self._body_frame,
             text=initial_value,
             font=customtkinter.CTkFont(
+                family="Inter",
+                size=FONT_SIZE_HEADER,
+                weight="bold",
+            ),
+            text_color=theme_manager.get_color("primary", "#0084FF"),
+        )
+        self._value_label.pack(pady=(PADDING, 0))
