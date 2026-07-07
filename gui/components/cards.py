@@ -1,11 +1,11 @@
 """
-===============================================================================
+==============================================================================
 RemoteDesk Pro
 File: gui/components/cards.py
 
 Reusable card-style container widgets for organizing UI content.
 Includes StatusCard, SystemStatusCard, and other specialized cards.
-===============================================================================
+==============================================================================
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from core.constants import (
     ICON_SIZE,
 )
 from core.theme_manager import get_theme_manager
+from core.utils import load_image
 
 theme_manager = get_theme_manager()
 
@@ -102,8 +103,8 @@ class Card(customtkinter.CTkFrame):
                 self._header_frame,
                 text=self._title,
                 font=customtkinter.CTkFont(
-                    family="Inter", 
-                    size=FONT_SIZE_LABEL, 
+                    family="Inter",
+                    size=FONT_SIZE_LABEL,
                     weight="bold"
                 ),
                 text_color=theme_manager.get_color("card_title", "#FFFFFF"),
@@ -115,9 +116,9 @@ class Card(customtkinter.CTkFrame):
             self, fg_color="transparent"
         )
         self._body_frame.pack(
-            fill="both", 
-            expand=True, 
-            padx=PADDING, 
+            fill="both",
+            expand=True,
+            padx=PADDING,
             pady=PADDING
         )
         
@@ -146,8 +147,8 @@ class Card(customtkinter.CTkFrame):
                 self, fg_color="transparent"
             )
             self._footer_frame.pack(
-                fill="x", 
-                padx=PADDING, 
+                fill="x",
+                padx=PADDING,
                 pady=(0, PADDING)
             )
         
@@ -167,6 +168,10 @@ class Card(customtkinter.CTkFrame):
         """Clean up resources."""
         theme_manager.unregister_theme_change_callback(self._on_theme_change)
         super().destroy()
+
+
+# Backwards-compatibility alias expected by some pages
+PageCard = Card
 
 
 class StatusCard(Card):
@@ -195,8 +200,8 @@ class StatusCard(Card):
             self._body_frame,
             text=value,
             font=customtkinter.CTkFont(
-                family="Inter", 
-                size=FONT_SIZE_HEADER, 
+                family="Inter",
+                size=FONT_SIZE_HEADER,
                 weight="bold"
             ),
             text_color=theme_manager.get_color("primary", "#0084FF"),
@@ -208,8 +213,8 @@ class StatusCard(Card):
             icon = load_image(self._icon, size=(32, 32))
             if icon:
                 icon_label = customtkinter.CTkLabel(
-                    self._body_frame, 
-                    image=icon, 
+                    self._body_frame,
+                    image=icon,
                     text=""
                 )
                 icon_label.pack(pady=(PADDING, 0))
@@ -252,62 +257,3 @@ class SystemStatusCard(Card):
             self._body_frame,
             text=initial_value,
             font=customtkinter.CTkFont(
-                family="Inter", 
-                size=FONT_SIZE_HEADER, 
-                weight="bold"
-            ),
-            text_color=theme_manager.get_color("primary", "#0084FF"),
-        )
-        self._value_label.pack(pady=(PADDING, 0))
-
-    def update_value(self, value: str) -> None:
-        """Update the displayed value."""
-        if self._value_label:
-            self._value_label.configure(text=value)
-
-
-class ActionCard(Card):
-    """
-    Card with a prominent action button.
-    """
-    
-    def __init__(
-        self,
-        master: customtkinter.CTk,
-        title: str,
-        button_text: str,
-        command: Optional[callable] = None,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(master, title=title, **kwargs)
-        self._command = command
-        self._create_action_button(button_text)
-
-    def _create_action_button(self, button_text: str) -> None:
-        """Create the action button."""
-        action_btn = customtkinter.CTkButton(
-            self._body_frame,
-            text=button_text,
-            command=self._command,
-            font=customtkinter.CTkFont(family="Inter", size=FONT_SIZE_BODY, weight="bold"),
-            width=200,
-            height=40,
-        )
-        action_btn.pack(pady=(PADDING, 0))
-
-
-# For testing/demo purposes
-if __name__ == "__main__":
-    demo = customtkinter.CTk()
-    demo.geometry("800x600")
-    demo.title("Card Components Demo")
-    
-    # Create a simple card
-    card = Card(demo, title="Sample Card", height=150)
-    card.pack(pady=20, padx=20, fill="x")
-    
-    # Add some content
-    label = customtkinter.CTkLabel(card._body_frame, text="This is card content")
-    label.pack(pady=20)
-    
-    demo.mainloop()
