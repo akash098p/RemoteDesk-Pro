@@ -1,15 +1,15 @@
 """
-===============================================================================
+==============================================================================
 RemoteDesk Pro
 File: gui/components/buttons.py
 
 Defines various reusable button widgets for the application, ensuring
 consistent styling and theme integration.
-===============================================================================
+==============================================================================
 """
 from __future__ import annotations
 
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union, Any
 
 import customtkinter
 
@@ -19,6 +19,16 @@ from core.constants import (
 )
 from core.theme_manager import get_theme_manager
 from core.utils import load_image
+
+# Safe logger fallback — GUI modules may be imported before the core logger is ready
+try:
+    from core.logger import get_logger
+
+    logger = get_logger()
+except Exception:
+    import logging as _logging
+
+    logger = _logging.getLogger(__name__)
 
 theme_manager = get_theme_manager()
 
