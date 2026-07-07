@@ -110,7 +110,7 @@ class ThemeManager:
                 if not isinstance(data, dict):
                     raise ValueError(f"Theme file {theme_name}.json content is not a dictionary.")
                 logger.debug(f"Loaded theme data from {theme_file_path}")
-                return data
+                return self._normalize_theme_data(data)
             except (json.JSONDecodeError, ValueError) as e:
                 logger.error(f"Error parsing theme file {theme_file_path}: {e}. Using hardcoded defaults.")
             except IOError as e:
@@ -122,12 +122,60 @@ class ThemeManager:
         logger.warning(f"Using hardcoded default colors for theme '{theme_name}'.")
         from core.constants import DARK_THEME_COLORS, LIGHT_THEME_COLORS # Deferred import to avoid circular dependency
         if theme_name == "dark":
-            return DARK_THEME_COLORS
+            return self._normalize_theme_data(DARK_THEME_COLORS)
         elif theme_name == "light":
-            return LIGHT_THEME_COLORS
+            return self._normalize_theme_data(LIGHT_THEME_COLORS)
         else:
             # Fallback for unknown themes to dark theme defaults
-            return DARK_THEME_COLORS
+            return self._normalize_theme_data(DARK_THEME_COLORS)
+
+    def _normalize_theme_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize theme keys so legacy names and generic keys both work."""
+        normalized = dict(data)
+
+        def alias(key: str, fallback_keys: list[str]) -> None:
+            if key not in normalized:
+                for fallback_key in fallback_keys:
+                    if fallback_key in normalized:
+                        normalized[key] = normalized[fallback_key]
+                        break
+
+        alias("text_primary", ["text"])
+        alias("text_secondary", ["secondary_text", "text"])
+        alias("text_on_primary", ["text_primary", "text"])
+        alias("text_on_error", ["text_primary", "text"])
+        alias("card_bg", ["card"])
+        alias("card_border", ["border"])
+        alias("sidebar_button_bg", ["sidebar", "card", "background"])
+        alias("sidebar_button_hover_bg", ["surface_hover", "sidebar", "background"])
+        alias("sidebar_button_text", ["text_primary", "text"])
+        alias("titlebar_bg", ["sidebar", "card", "background"])
+        alias("titlebar_text", ["text_primary", "text"])
+        alias("titlebar_minimize_bg", ["sidebar", "card", "background"])
+        alias("titlebar_maximize_bg", ["sidebar", "card", "background"])
+        alias("titlebar_close_bg", ["danger", "primary"])
+        alias("titlebar_close_hover", ["danger", "primary"])
+        alias("titlebar_control_hover", ["surface_hover", "sidebar"])
+        alias("statusbar_bg", ["sidebar", "card", "background"])
+        alias("statusbar_text", ["text_primary", "text"])
+        alias("statusbar_secondary_text", ["text_secondary", "text_primary", "text"])
+        alias("notification_bg", ["card", "sidebar", "background"])
+        alias("notification_title", ["text_primary", "text"])
+        alias("notification_message", ["text_secondary", "text_primary", "text"])
+        alias("notification_badge", ["danger", "warning"])
+        alias("notification_close_bg", ["danger", "primary"])
+        alias("notification_close_hover", ["danger", "primary"])
+        alias("dialog_bg", ["card", "sidebar", "background"])
+        alias("dialog_title", ["text_primary", "text"])
+        alias("dialog_text", ["text_secondary", "text_primary", "text"])
+        alias("primary_hover", ["primary"])
+        alias("secondary_hover", ["surface_hover", "sidebar", "background"])
+        alias("secondary", ["card", "sidebar", "background"])
+        alias("surface", ["card", "sidebar", "background"])
+        alias("surface_hover", ["sidebar", "background"])
+        alias("background", ["background"])
+
+        return normalized
 
     def _load_custom_fonts(self) -> None:
         """
