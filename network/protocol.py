@@ -21,6 +21,10 @@ class MessageType(Enum):
     CONTROL = "control"
     ERROR = "error"
     LOG = "log"
+    CHAT_MESSAGE = "chat_message"
+    ATTACHMENT_METADATA = "attachment_metadata"
+    ATTACHMENT_CHUNK = "attachment_chunk"
+    CLIPBOARD_SYNC = "clipboard_sync"
 
 class ProtocolVersion(Enum):
     """Supported protocol versions."""

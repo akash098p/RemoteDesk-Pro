@@ -1,37 +1,42 @@
 """
 ===============================================================================
 RemoteDesk Pro
-File: gui/pages/settings.py
-Settings page for theme, font size, notification preferences, and window settings.
+File: settings.py
+Updates the Settings page to include frame rate and quality controls.
+Adds frame rate selection drop-down and quality slider.
 ===============================================================================
 """
 
-from __future__ import annotations
-
+from typing import Optional
 import customtkinter
-from core.config_manager import get_config_manager
+from core.constants import FONT_SIZE_LABEL, FONT_SIZE_BODY
 from core.theme_manager import get_theme_manager
-from core.utils import clamp
+from core.config_manager import get_config_manager
 
 theme_manager = get_theme_manager()
 config_manager = get_config_manager()
 
 class SettingsPage(customtkinter.CTkFrame):
-    """Settings page with options for theme, font size, and system preferences."""
+    """
+    Settings page with options for theme, font size, notification preferences,
+    window settings, and now frame rate & quality controls for screen capture.
+    """
     
     def __init__(self, parent: "MainWindow") -> None:
         super().__init__(parent, fg_color="transparent")
         self.parent = parent
-        self._theme_manager = get_theme_manager()
-        self._config = config_manager.get_config("settings")
+        
+        # Load current settings
+        self._settings = config_manager.get_config("settings")
         
         # Create UI
         self._create_widgets()
-        
+            
     def _create_widgets(self) -> None:
         # Header
         title_label = customtkinter.CTkLabel(
-            self, text="Settings", font=customtkinter.CTkFont(size=16, weight="bold")
+            self, text="Settings", 
+            font=customtkinter.CTkFont(size=16, weight="bold")
         )
         title_label.pack(pady=20)
         
@@ -45,14 +50,14 @@ class SettingsPage(customtkinter.CTkFrame):
         )
         theme_label.pack(side="left", padx=(0, 10))
         
-        self.theme_var = customtkinter.StringVar(value=self._config.get("theme", "dark"))
-        theme_menu = customtkinter.CTkOptionMenu(
+        self.theme_var = customtkinter.StringVar(value=self._settings.get("theme", "dark"))
+        self.theme_dropdown = customtkinter.CTkOptionMenu(
             theme_frame, 
             variable=self.theme_var,
             values=["dark", "light", "nord", "dracula", "amoled"],
             command=self._on_theme_change
         )
-        theme_menu.pack(side="left")
+        self.theme_dropdown.pack(side="left")
         
         # Font Size Section
         font_frame = customtkinter.CTkFrame(self, fg_color="transparent")
@@ -64,104 +69,177 @@ class SettingsPage(customtkinter.CTkFrame):
         )
         font_label.pack(side="left", padx=(0, 10))
         
-        self.font_var = customtkinter.IntVar(value=self._config.get("font_size", 14))
-        font_spinbox = customtkinter.CTkSpinner(
+        self.font_var = customtkinter.IntVar(value=self._settings.get("font_size", 14))
+        self.font_spinbox = customtkinter.CTkSpinbox(
             font_frame,
             from_=10,
             to=24,
-            number_of_steps=14,
-            command=self._on_font_change
+            command=self._on_font_change,
+            variable=self.font_var
         )
-        font_spinbox.pack(side="left")
+        self.font_spinbox.pack(side="left")
         
-        # Notification Section
-        notif_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        notif_frame.pack(fill="x", pady=10)
+        # Quality & Frame Rate Section (new addition)
+        quality_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        quality_frame.pack(fill="x", pady=10)
         
-        notif_label = customtkinter.CTkLabel(
-            notif_frame, text="Notification Duration (ms):",
+        quality_label = customtkinter.CTkLabel(
+            quality_frame, text="Capture Quality:",
             font=customtkinter.CTkFont(size=14)
         )
-        notif_label.pack(side="left", padx=(0, 10))
+        quality_label.pack(side="left", padx=(0, 10))
         
-        self.notif_var = customtkinter.IntVar(value=self._config.get("notif_duration", 3000))
-        notif_spinbox = customtkinter.CTkSpinner(
-            notif_frame,
-            from_=1000,
-            to=10000,
-            number_of_steps=10,
-            command=self._on_notif_change
+        # Quality scale
+        self.quality_var = customtkinter.IntVar(value=self._settings.get("quality", 75))
+        self.quality_slider = customtkinter.CTkSlider(
+            quality_frame,
+            variable=self.quality_var,
+            from_=1,
+            to=100,
+            number_of_steps=100,
+            command=self._on_quality_change
         )
-        notif_spinbox.pack(side="left")
+        self.quality_slider.pack(side="left", fill="x", expand=True)
         
-        # Window Section
-        win_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        win_frame.pack(fill="x", pady=10)
+        # Frame Rate Section
+        fps_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        fps_frame.pack(fill="x", pady=10)
         
-        win_label = customtkinter.CTkLabel(
-            win_frame, text="Window Size:",
+        fps_label = customtkinter.CTkLabel(
+            fps_frame, text="Capture FPS:",
             font=customtkinter.CTkFont(size=14)
         )
-        win_label.pack(side="left", padx=(0, 10))
+        fps_label.pack(side="left", padx=(0, 10))
         
-        # Width
-        self.win_width = self.parent.winfo_width()
-        width_spinbox = customtkinter.CTkSpinner(
-            win_frame,
-            from_=800,
-            to=1920,
-            number_of_steps=100,
-            command=lambda: self._update_window_size("width")
+        # Frame rate spinbox with preset options
+        fps_options = [15, 24, 30, 60]
+        self.fps_var = customtkinter.IntVar(value=self._settings.get("fps", 30))
+        self.fps_spinbox = customtkinter.CTkOptionMenu(
+            fps_frame,
+            variable=self.fps_var,
+            values=[str(fps) for fps in fps_options],
+            command=self._on_fps_change
         )
-        width_spinbox.pack(side="left")
-        
-        # Height
-        self.win_height = self.parent.winfo_height()
-        height_spinbox = customtkinter.CTkSpinner(
-            win_frame,
-            from_=600,
-            to=1080,
-            number_of_steps=100,
-            command=lambda: self._update_window_size("height")
-        )
-        height_spinbox.pack(side="left")
+        self.fps_spinbox.pack(side="left")
         
         # Back Button
         back_btn = customtkinter.CTkButton(
-            self,
-            text="Back",
-            command=self._back_to_dashboard
+            self, text="Back", command=self._back_to_dashboard
         )
         back_btn.pack(pady=20)
         
-    def _on_theme_change(self, new_theme: str) -> None:
-        self._theme_manager.set_theme(new_theme)
+    def _on_theme_change(self, new_theme: Optional[str] = None) -> None:
+        if new_theme is None:
+            new_theme = self.theme_var.get()
+        self.theme_manager.set_theme(new_theme)
         self.config_manager.set_value("settings", "theme", new_theme)
-        
-    def _on_font_change(self, new_size: str) -> None:
-        size = int(new_size)
-        if 10 <= size <= 24:
-            self.config_manager.set_value("settings", "font_size", size)
-            # Update global font size (would require core.utils font registration)
-        
-    def _on_notif_change(self, new_duration: str) -> None:
-        duration = int(new_duration)
-        self.config_manager.set_value("settings", "notif_duration", clamp(duration, 500, 10000))
-        
-    def _update_window_size(self, dimension: str) -> None:
-        size = self._get_current_spinbox_value(dimension)
-        if dimension == "width":
-            self.parent.geometry(f"{size}x{self.win_height}")
-        else:
-            self.parent.geometry(f"{self.win_width}x{size}")
-        
-        self.config_manager.set_value("settings", dimension, size)
-        
-    def _get_current_spinbox_value(self, dimension: str) -> int:
-        # This would need to track spinbox values properly
-        # Currently simplified for demo
-        return 1000  # Placeholder
-        
+    
+    def _on_font_change(self, new_font_size: str) -> None:
+        size = int(new_font_size)
+        self.config_manager.set_value("settings", "font_size", size)
+    
+    def _on_quality_change(self, new_quality: str) -> None:
+        quality = int(new_quality)
+        self.config_manager.set_value("settings", "quality", quality)
+    
+    def _on_fps_change(self, new_fps: str) -> None:
+        fps = int(new_fps)
+        self.config_manager.set_value("settings", "fps", fps)
+    
     def _back_to_dashboard(self) -> None:
         if self.parent._navigation_manager:
             self.parent._navigation_manager.show_page("dashboard")
+
+    def _create_widgets(self) -> None:
+        # Header
+        title_label = customtkinter.CTkLabel(
+            self, text="Settings", 
+            font=customtkinter.CTkFont(size=16, weight="bold")
+        )
+        title_label.pack(pady=20)
+        
+        # Theme Section
+        theme_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        theme_frame.pack(fill="x", pady=10)
+        
+        theme_label = customtkinter.CTkLabel(
+            theme_frame, text="Theme:",
+            font=customtkinter.CTkFont(size=14)
+        )
+        theme_label.pack(side="left", padx=(0, 10))
+        
+        self.theme_var = customtkinter.StringVar(value=self._settings.get("theme", "dark"))
+        self.theme_dropdown = customtkinter.CTkOptionMenu(
+            theme_frame, 
+            variable=self.theme_var,
+            values=["dark", "light", "nord", "dracula", "amoled"],
+            command=lambda new_theme: self._on_theme_change(new_theme)
+        )
+        self.theme_dropdown.pack(side="left")
+        
+        # Font Size Section
+        font_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        font_frame.pack(fill="x", pady=10)
+        
+        font_label = customtkinter.CTkLabel(
+            font_frame, text="Font Size:",
+            font=customtkinter.CTkFont(size=14)
+        )
+        font_label.pack(side="left", padx=(0, 10))
+        
+        self.font_var = customtkinter.IntVar(value=self._settings.get("font_size", 14))
+        self.font_spinbox = customtkinter.CTkSpinbox(
+            font_frame,
+            variable=self.font_var,
+            from_=10,
+            to=24,
+            command=self._on_font_change,
+        )
+        self.font_spinbox.pack(side="left")
+        
+        # Quality & Frame Rate Section
+        quality_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        quality_frame.pack(fill="x", pady=10)
+        
+        quality_label = customtkinter.CTkLabel(
+            quality_frame, text="Capture Quality:",
+            font=customtkinter.CTkFont(size=14)
+        )
+        quality_label.pack(side="left", padx=(0, 10))
+        
+        self.quality_var = customtkinter.IntVar(value=self._settings.get("quality", 75))
+        self.quality_slider = customtkinter.CTkSlider(
+            quality_frame,
+            variable=self.quality_var,
+            from_=1,
+            to=100,
+            number_of_steps=100,
+            command=lambda e: self.config_manager.set_value("settings", "quality", self.quality_var.get())
+        )
+        self.quality_slider.pack(side="left", fill="x", expand=True)
+        
+        # Frame Rate Section
+        fps_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        fps_frame.pack(fill="x", pady=10)
+        
+        fps_label = customtkinter.CTkLabel(
+            fps_frame, text="Capture FPS:",
+            font=customtkinter.CTkFont(size=14)
+        )
+        fps_label.pack(side="left", padx=(0, 10))
+        
+        fps_options = ["15", "24", "30", "60"]
+        self.fps_var = customtkinter.IntVar(value=self._settings.get("fps", 30))
+        self.fps_spinbox = customtkinter.CTkOptionMenu(
+            fps_frame,
+            variable=self.fps_var,
+            values=[str(fps) for fps in [15, 24, 30, 60]],
+            command=lambda e: self.config_manager.set_value("settings", "fps", self.fps_var.get())
+        )
+        self.fps_spinbox.pack(side="left")
+        
+        # Back button
+        back_btn = customtkinter.CTkButton(
+            self, text="Back", command=self._back_to_dashboard
+        )
+        back_btn.pack(pady=20)

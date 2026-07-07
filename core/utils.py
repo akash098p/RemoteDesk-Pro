@@ -20,12 +20,23 @@ import psutil
 import customtkinter
 from PIL import Image
 
-from core.constants import ICONS_DIR, IMAGES_DIR, CACHE_ICON_SIZE, APP_VERSION
+from core.constants import (
+    ICONS_DIR,
+    IMAGES_DIR,
+    CACHE_ICON_SIZE,
+    APP_VERSION,
+    ensure_directories as _ensure_directories,
+)
 from core.logger import get_logger
 
 logger = get_logger()
 
 R = TypeVar('R') # Return type for decorator
+
+
+def ensure_directories() -> None:
+    """Compatibility wrapper for the directory-creation helper."""
+    _ensure_directories()
 
 def run_in_thread(func: Callable[..., R]) -> Callable[..., R]:
     """
@@ -60,16 +71,15 @@ def load_image(image_name: str, path: Path = ICONS_DIR, size: Tuple[int, int] = 
         return None
 
     try:
-        # CustomTkinter handles SVG, PNG, JPG directly
-        # For SVG, it's often better to let CTkImage handle rendering at desired size directly
-        # For raster images, PIL.Image.open and resize for better control
+        # CustomTkinter does not reliably support SVG through PIL in this environment.
+        # Use raster images only, and skip SVGs if Pillow cannot identify them.
         if image_path.suffix.lower() == ".svg":
-            image = customtkinter.CTkImage(light_image=Image.open(image_path), dark_image=Image.open(image_path), size=size)
-        else:
-            # For raster images, open with PIL and resize before converting to CTkImage
-            pil_image = Image.open(image_path)
-            pil_image = pil_image.resize(size, Image.LANCZOS)
-            image = customtkinter.CTkImage(light_image=pil_image, dark_image=pil_image, size=size)
+            logger.warning(f"Skipping SVG image loading for unsupported format: {image_path}")
+            return None
+
+        pil_image = Image.open(image_path)
+        pil_image = pil_image.resize(size, Image.LANCZOS)
+        image = customtkinter.CTkImage(light_image=pil_image, dark_image=pil_image, size=size)
 
         logger.debug(f"Loaded image: {image_path.name} with size {size}")
         return image

@@ -78,6 +78,7 @@ class TitleBar(customtkinter.CTkFrame):
         self.configure(height=40)
         
         # Left side: Icon
+        self._icon_label = None
         if icon_path:
             icon = load_image(icon_path, size=(ICON_SIZE, ICON_SIZE))
             if icon:
@@ -88,8 +89,6 @@ class TitleBar(customtkinter.CTkFrame):
                     anchor="w",
                 )
                 self._icon_label.pack(side="left", padx=(PADDING, 0))
-        else:
-            self._icon_label = None
         
         # Center: Title Label
         self._title_label = customtkinter.CTkLabel(

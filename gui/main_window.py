@@ -105,7 +105,10 @@ class MainWindow(customtkinter.CTk):
         """Configure the main window properties."""
         # Set initial theme
         theme = self.config_manager.get_value("config", "theme", "dark")
-        self.set_appearance_mode(theme)
+        if hasattr(customtkinter, "set_appearance_mode"):
+            customtkinter.set_appearance_mode(theme)
+        else:
+            self.set_appearance_mode(theme)
 
         # Window dimensions
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")

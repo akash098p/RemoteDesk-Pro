@@ -16,8 +16,11 @@ import customtkinter
 from core.constants import (
     SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_ANIMATION_SPEED
 )
+from core.logger import get_logger
 from core.theme_manager import get_theme_manager
 from gui.components.buttons import SidebarButton
+
+logger = get_logger()
 
 theme_manager = get_theme_manager()
 

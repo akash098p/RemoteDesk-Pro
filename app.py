@@ -8,27 +8,28 @@ This file initializes the application with the configured settings.
 """
 
 import sys
-import os
-from tkinter import Tk
+import tkinter
+from tkinter import TclError
 
 from core.config_manager import get_config_manager
 from gui.main_window import create_main_window
 
+
 def main() -> None:
-    # Set up configuration
-    config = get_config_manager()
-    config.load_all()  # Load any existing settings
-    
-    # Create main window
-    app = Tk()
-    app.title(f"{APP_NAME} v{APP_VERSION}")  # Need to store version in config
-    
-    # Create and run the main window
-    main_window = create_main_window(config)
-    main_window.run()
-    
-    # Keep the window running
-    app.mainloop()
+    try:
+        # Set up configuration
+        config = get_config_manager()
+
+        # Create and run the main window
+        main_window = create_main_window(config)
+        main_window.run()
+    except TclError as exc:
+        print(f"Unable to start GUI: {exc}", file=sys.stderr)
+        print(
+            "Install a Python build with Tk/Tcl support enabled, or use a Python environment that includes tkinter.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

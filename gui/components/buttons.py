@@ -36,12 +36,17 @@ class BaseButton(customtkinter.CTkButton):
         corner_radius: int = CORNER_RADIUS,
         font_size: int = FONT_SIZE_BODY,
         icon: Optional[Union[str, customtkinter.CTkImage]] = None,
+        icon_size: int = ICON_SIZE,
         **kwargs: Any,
     ) -> None:
         
         self._master = master
         self._icon_name = icon if isinstance(icon, str) else None
         self._icon_image = icon if isinstance(icon, customtkinter.CTkImage) else None
+        self._icon_size = icon_size
+
+        unsupported = {"icon_size", "hover_text", "padx"}
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k not in unsupported}
 
         super().__init__(
             master=master,
@@ -51,7 +56,7 @@ class BaseButton(customtkinter.CTkButton):
             height=height,
             corner_radius=corner_radius,
             font=theme_manager.get_font("Inter", font_size, "medium"),
-            **kwargs,
+            **filtered_kwargs,
         )
         self._apply_theme_colors()
         theme_manager.register_theme_change_callback(self._on_theme_change)
@@ -77,15 +82,15 @@ class BaseButton(customtkinter.CTkButton):
         Loads the icon image if an icon_name is provided and sets it to the button.
         """
         if self._icon_name:
-            self._icon_image = load_image(self._icon_name, size=(ICON_SIZE, ICON_SIZE))
+            self._icon_image = load_image(self._icon_name, size=(self._icon_size, self._icon_size))
             if self._icon_image:
-                self.configure(image=self._icon_image, compound="left", padx=PADDING / 2)
+                self.configure(image=self._icon_image, compound="left")
             else:
-                self.configure(image=None, compound="none", padx=0) # Clear image if loading failed
+                self.configure(image=None, compound="none") # Clear image if loading failed
         elif self._icon_image: # If a CTkImage was passed directly
-            self.configure(image=self._icon_image, compound="left", padx=PADDING / 2)
+            self.configure(image=self._icon_image, compound="left")
         else:
-            self.configure(image=None, compound="none", padx=0)
+            self.configure(image=None, compound="none")
 
 
     def set_icon(self, icon: Optional[Union[str, customtkinter.CTkImage]]) -> None:
@@ -153,6 +158,10 @@ class SidebarButton(BaseButton):
         command: Optional[Callable[..., Any]] = None,
         icon: Optional[Union[str, customtkinter.CTkImage]] = None,
         is_active: bool = False,
+        width: int = BUTTON_WIDTH,
+        height: int = BUTTON_HEIGHT,
+        corner_radius: int = CORNER_RADIUS,
+        font_size: int = FONT_SIZE_BODY,
         **kwargs: Any,
     ) -> None:
         self._is_active = is_active
@@ -160,10 +169,10 @@ class SidebarButton(BaseButton):
             master=master,
             text=text,
             command=command,
-            width=BUTTON_WIDTH,
-            height=BUTTON_HEIGHT,
-            corner_radius=CORNER_RADIUS,
-            font_size=FONT_SIZE_BODY,
+            width=width,
+            height=height,
+            corner_radius=corner_radius,
+            font_size=font_size,
             anchor="w", # Align text and icon to the left
             padx=PADDING,
             icon=icon,
@@ -176,14 +185,12 @@ class SidebarButton(BaseButton):
                 fg_color=theme_manager.get_color("sidebar_button_active_bg", "primary"),
                 hover_color=theme_manager.get_color("sidebar_button_active_hover_bg", "primary_hover"),
                 text_color=theme_manager.get_color("sidebar_button_active_text", "text_on_primary"),
-                image_property="text_color", # Icons also get active text color
             )
         else:
             self.configure(
                 fg_color=theme_manager.get_color("sidebar_button_bg", "transparent"),
                 hover_color=theme_manager.get_color("sidebar_button_hover_bg", "surface_hover"),
                 text_color=theme_manager.get_color("sidebar_button_text", "text_primary"),
-                image_property="text_color",
             )
 
     def set_active(self, active: bool) -> None:
@@ -193,7 +200,11 @@ class SidebarButton(BaseButton):
         if self._is_active != active:
             self._is_active = active
             self._apply_theme_colors()
-            logger.debug(f"Sidebar button '{self.cget("text")}' set to active: {active}")
+            logger.debug(f"Sidebar button '{self.cget('text')}' set to active: {active}")
+
+    def _set_nav_key(self, key: str) -> None:
+        """Set the internal navigation key for sidebar state tracking."""
+        self._nav_key = key
 
 
 class IconButton(BaseButton):

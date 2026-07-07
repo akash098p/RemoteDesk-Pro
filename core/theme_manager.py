@@ -147,8 +147,11 @@ class ThemeManager:
             if font_path.exists():
                 try:
                     customtkinter.deactivate_automatic_dpi_awareness() # Prevents font issues on Windows
-                    customtkinter.load_font(str(font_path))
-                    logger.debug(f"Loaded custom font: {font_path.name}")
+                    if hasattr(customtkinter, "load_font"):
+                        customtkinter.load_font(str(font_path))
+                        logger.debug(f"Loaded custom font: {font_path.name}")
+                    else:
+                        logger.debug(f"CustomTkinter version does not expose load_font; skipping {font_path.name}")
                 except Exception as e:
                     logger.error(f"Failed to load font {font_path.name}: {e}")
             else:
@@ -177,9 +180,18 @@ class ThemeManager:
         # CustomTkinter expects 'colors' dict with specific keys
         ctk_theme = {"CTk": {"colors": self._current_theme_data}}
         try:
-            customtkinter.set_widget_style(ctk_theme)
-            customtkinter.set_default_color_theme(theme_name) # This uses built-in if theme_name matches, otherwise custom
-            customtkinter.set_appearance_mode(theme_name) # This sets light/dark mode
+            if hasattr(customtkinter, "set_widget_style"):
+                customtkinter.set_widget_style(ctk_theme)
+
+            if hasattr(customtkinter, "set_default_color_theme") and theme_name not in {"dark", "light"}:
+                try:
+                    customtkinter.set_default_color_theme(theme_name)
+                except Exception as e:
+                    logger.debug(f"Skipping set_default_color_theme for theme '{theme_name}': {e}")
+
+            if hasattr(customtkinter, "set_appearance_mode"):
+                customtkinter.set_appearance_mode(theme_name)
+
             logger.info(f"Successfully applied theme: {theme_name}")
             
             if not initial_load:
@@ -229,15 +241,19 @@ class ThemeManager:
         Returns:
             A CTkFont object.
         """
-        font_key = (font_name, size, weight)
+        normalized_weight = weight if weight in {"normal", "bold"} else "normal"
+        if weight != normalized_weight:
+            logger.warning(f"Unsupported font weight '{weight}' for font '{font_name}', falling back to '{normalized_weight}'.")
+
+        font_key = (font_name, size, normalized_weight)
         if font_key not in self._font_cache:
             try:
                 # CustomTkinter automatically handles loaded fonts by name
-                self._font_cache[font_key] = customtkinter.CTkFont(family=font_name, size=size, weight=weight)
+                self._font_cache[font_key] = customtkinter.CTkFont(family=font_name, size=size, weight=normalized_weight)
             except Exception as e:
-                logger.error(f"Failed to create font {font_name}, size {size}, weight {weight}: {e}")
+                logger.error(f"Failed to create font {font_name}, size {size}, weight {normalized_weight}: {e}")
                 # Fallback to default CustomTkinter font
-                self._font_cache[font_key] = customtkinter.CTkFont(size=size, weight=weight)
+                self._font_cache[font_key] = customtkinter.CTkFont(size=size, weight=normalized_weight)
         return self._font_cache[font_key]
 
     @property

@@ -10,13 +10,22 @@ Manages connection lifecycle and provides status updates.
 from __future__ import annotations
 
 import time
-from typing import Callable, Optional, Dict, Any
+import socket
+import threading
+from typing import Callable, Optional, Dict, Any, Tuple
 
 from network.socket_server import SocketServer
 from network.socket_client import SocketClient
-from core.logger import get_logger
+from network.protocol import RemoteDeskMessage, MessageType
+from core.logger import Logger
 
-logger = get_logger()
+# Import new communication modules
+from chat.manager import ChatManager
+from chat.message import ChatMessage
+from chat.attachments import AttachmentManager
+from clipboard.manager import ClipboardManager
+
+logger = Logger.get_logger()
 
 
 class ConnectionManager:
