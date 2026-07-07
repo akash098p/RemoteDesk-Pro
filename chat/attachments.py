@@ -96,8 +96,9 @@ class AttachmentManager:
     def _start_receive_thread(self, client_socket: Any, metadata: Dict[str, Any], on_complete: Callable[[str], None]):
         """
         Starts a new thread to receive a file attachment.
-        """\n        thread = threading.Thread(target=self._receive_attachment_task, 
-                                  args=(client_socket, metadata, on_complete), 
+        """
+        thread = threading.Thread(target=self._receive_attachment_task,
+                                  args=(client_socket, metadata, on_complete),
                                   daemon=True)
         thread.start()
         return thread
@@ -237,7 +238,8 @@ class AttachmentManager:
     def shutdown(self):
         """
         Closes any open file handles for ongoing transfers during shutdown.
-        """\n        self.logger.info("AttachmentManager shutting down. Closing any open transfer files.")
+        """
+        self.logger.info("AttachmentManager shutting down. Closing any open transfer files.")
         for message_id, transfer_info in list(self._ongoing_transfers.items()):
             try:
                 transfer_info["file_handle"].close()

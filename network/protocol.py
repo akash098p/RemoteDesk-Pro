@@ -7,6 +7,7 @@ Enforces structured and type-safe message passing.
 ===============================================================================
 """
 
+import base64
 from typing import Dict, Any, List, Optional
 from enum import Enum
 
@@ -25,6 +26,7 @@ class MessageType(Enum):
     ATTACHMENT_METADATA = "attachment_metadata"
     ATTACHMENT_CHUNK = "attachment_chunk"
     CLIPBOARD_SYNC = "clipboard_sync"
+    SCREEN_FRAME = "screen_frame"
 
 class ProtocolVersion(Enum):
     """Supported protocol versions."""
@@ -163,6 +165,23 @@ class MessageFactory:
             
         return RemoteDeskMessage(
             message_type=MessageType.DATA.value,
+            payload=payload,
+        )
+
+    @staticmethod
+    def create_screen_frame(frame_bytes: bytes, metadata: Optional[Dict[str, Any]] = None) -> "RemoteDeskMessage":
+        """Create a screen frame message with base64-encoded payload."""
+        encoded_frame = base64.b64encode(frame_bytes).decode("ascii")
+        payload = {
+            "frame_data": encoded_frame,
+            "format": "jpeg",
+            "timestamp": time.time(),
+        }
+        if metadata:
+            payload["metadata"] = metadata
+
+        return RemoteDeskMessage(
+            message_type=MessageType.SCREEN_FRAME.value,
             payload=payload,
         )
 

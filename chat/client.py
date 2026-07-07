@@ -12,7 +12,8 @@ from chat.message import ChatMessage
 class ChatClient:
     """
     Manages sending and receiving chat messages on the client side.
-    """\n    def __init__(
+    """
+    def __init__(
         self,
         client_socket: socket.socket,
         on_message_received: Callable[[ChatMessage], None],

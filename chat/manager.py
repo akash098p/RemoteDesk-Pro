@@ -114,7 +114,3 @@ class ChatManager:
         if self.chat_client:
             self.chat_client.shutdown()
         self.logger.info("ChatManager shut down complete.")
-
-
-from network.connection_manager import ConnectionManager # Import here to avoid circular dependency
-import socket

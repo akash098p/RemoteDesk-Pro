@@ -138,11 +138,17 @@ class StreamingClient:
                 size=img.size
             )
             
-            # Update widget
+# Update widget on the main thread
             if self._display_widget:
-                self._display_widget.configure(image=ctk_image)
-                # Keep reference to prevent garbage collection
-                self._display_widget._current_image = ctk_image
+                def update_widget() -> None:
+                    self._display_widget.configure(image=ctk_image)
+                    self._display_widget._current_image = ctk_image
+
+                try:
+                    self._display_widget.after(0, update_widget)
+                except Exception:
+                    self._display_widget.configure(image=ctk_image)
+                    self._display_widget._current_image = ctk_image
             
             # Callback if provided
             if self._on_frame_received:

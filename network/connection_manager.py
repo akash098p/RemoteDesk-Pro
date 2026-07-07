@@ -19,12 +19,6 @@ from network.socket_client import SocketClient
 from network.protocol import RemoteDeskMessage, MessageType
 from core.logger import get_logger
 
-# Import new communication modules
-from chat.manager import ChatManager
-from chat.message import ChatMessage
-from chat.attachments import AttachmentManager
-from clipboard.manager import ClipboardManager
-
 logger = get_logger()
 
 
@@ -79,7 +73,7 @@ class ConnectionManager:
                     max_clients=kwargs.get("max_clients", 10),
                     on_client_connect=self._on_server_client_connect,
                     on_client_disconnect=self._on_server_client_disconnect,
-                    on_message=self._on_server_message,
+                    on_message_received=self._on_server_message,
                 )
                 
                 if self._server.start():
@@ -92,7 +86,7 @@ class ConnectionManager:
                     port=kwargs.get("port", self._server_port),
                     on_connect=self._on_client_connect,
                     on_disconnect=self._on_client_disconnect,
-                    on_message=self._on_client_message,
+                    on_message_received=self._on_client_message,
                 )
                 
                 if self._client.connect():
@@ -139,22 +133,25 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Error stopping connections: {e}")
     
-    def send_message(self, message: dict) -> bool:
+    def send_message(self, message: RemoteDeskMessage | dict, client_id: Optional[str] = None) -> bool:
         """
         Send a message through the appropriate connection.
         
         Args:
-            message: Message dictionary to send
+            message: Message object or dictionary to send
+            client_id: Specific client identifier when server mode requires a target
             
         Returns:
             True if message sent successfully, False otherwise
         """
         if not self._initialized:
             return False
-            
+
         try:
             if self._server:
-                return self._server.send_to_client(self._client_id, message)
+                if client_id:
+                    return self._server.send_to_client(client_id, message)
+                return self._server.broadcast_message(message)
             elif self._client:
                 return self._client.send_message(message)
             return False
@@ -260,13 +257,12 @@ class ConnectionManager:
         if self._client_callback:
             self._client_callback("disconnection", {"client_id": client_id, "status": "disconnected"})
     
-    def _on_client_message(self, client_id: str, message: dict) -> None:
+    def _on_client_message(self, message: RemoteDeskMessage) -> None:
         """
         Handle incoming message on the client side.
         
         Args:
-            client_id: Client identifier
-            message: Received message dictionary
+            message: Received message object
         """
         logger.debug(f"Received message from server: {message}")
         if self._client_callback:
