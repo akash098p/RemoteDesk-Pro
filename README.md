@@ -176,7 +176,7 @@ RemoteDesk-Pro/
 
 # 🚀 Development Roadmap
 
-## ✅ Phase 1
+## ✅ Phase 1 — Foundation
 
 - Project Structure
 - Virtual Environment
@@ -188,7 +188,7 @@ RemoteDesk-Pro/
 
 ---
 
-## 🚧 Phase 2
+## ✅ Phase 2 — UI & Navigation
 
 - Main Window
 - Sidebar
@@ -201,7 +201,7 @@ RemoteDesk-Pro/
 
 ---
 
-## ⏳ Phase 3
+## ✅ Phase 3 — Networking Core
 
 - Socket Server
 - Socket Client
@@ -211,7 +211,7 @@ RemoteDesk-Pro/
 
 ---
 
-## ⏳ Phase 4
+## ✅ Phase 4 — Screen Sharing
 
 - Screen Sharing
 - Video Compression
@@ -220,33 +220,38 @@ RemoteDesk-Pro/
 
 ---
 
-## ⏳ Phase 5
+## ✅ Phase 5 — Chat & Clipboard
 
 - Chat
 - Emoji
 - Attachments
 - Clipboard Sync
+- Chat page UI
+- Clipboard page UI
+- Icon loading and theme compatibility
 
 ---
 
-## ⏳ Phase 6
+## 🚧 Phase 6 — File Transfer
 
 - File Transfer
 - Folder Transfer
 - Image Preview
 - Download Manager
+- Transfer progress and reliability
 
 ---
 
-## ⏳ Phase 7
+## ⏳ Phase 7 — Remote Control
 
 - Remote Mouse
 - Remote Keyboard
 - Permission System
+- Secure session controls
 
 ---
 
-## ⏳ Phase 8
+## ⏳ Phase 8 — Polishing & Release
 
 - Audio Streaming
 - Notifications
