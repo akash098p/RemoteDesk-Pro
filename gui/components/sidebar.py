@@ -97,14 +97,21 @@ class Sidebar(customtkinter.CTkFrame):
             },
             {
                 "key": "connection",
-                "icon": "plug-zap.svg",
+                "icon": "plug-zap.png",
                 "text": "Connection",
                 "hover_text": "Network Status",
                 "icon_size": 24
             },
             {
+                "key": "screen",
+                "icon": "monitor.png",
+                "text": "Screen",
+                "hover_text": "Screen Sharing",
+                "icon_size": 24
+            },
+            {
                 "key": "chat",
-                "icon": "chat.svg",
+                "icon": "chat.png",
                 "text": "Chat",
                 "hover_text": "Team Messaging",
                 "icon_size": 24
@@ -118,21 +125,21 @@ class Sidebar(customtkinter.CTkFrame):
             },
             {
                 "key": "settings",
-                "icon": "settings.svg",
+                "icon": "settings.png",
                 "text": "Settings",
                 "hover_text": "Preferences",
                 "icon_size": 24
             },
             {
                 "key": "logs",
-                "icon": "file-text.svg",
+                "icon": "file-text.png",
                 "text": "Logs",
                 "hover_text": "Diagnostics",
                 "icon_size": 24
             },
             {
                 "key": "about",
-                "icon": "info.svg",
+                "icon": "info.png",
                 "text": "About",
                 "hover_text": "Application Info",
                 "icon_size": 24

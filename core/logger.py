@@ -360,3 +360,7 @@ def get_logger() -> Logger:
         Logger instance
     """
     return _logger_instance
+
+
+# Convenience module-level logger alias for legacy imports
+logger = _logger_instance

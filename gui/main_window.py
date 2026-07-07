@@ -163,6 +163,7 @@ class MainWindow(customtkinter.CTk):
         from gui.pages.logs import LogsPage
         from gui.pages.about import AboutPage
         from gui.pages.connection import ConnectionPage
+        from gui.pages.screen import ScreenPage
         from gui.pages.chat import ChatPage
         from gui.pages.clipboard import ClipboardPage
 
@@ -172,6 +173,7 @@ class MainWindow(customtkinter.CTk):
         # Register pages
         self._navigation_manager.register_page("dashboard", DashboardPage(self))
         self._navigation_manager.register_page("connection", ConnectionPage(self))
+        self._navigation_manager.register_page("screen", ScreenPage(self))
         self._chat_page = ChatPage(self, app_controller=self)
         self._navigation_manager.register_page("chat", self._chat_page)
         self._navigation_manager.register_page("clipboard", ClipboardPage(self))
