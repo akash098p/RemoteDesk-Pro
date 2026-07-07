@@ -2,9 +2,9 @@
 import threading
 import socket
 import json
-from typing import Dict, Callable
+from typing import Dict, Callable, Optional
 
-from core.logger import Logger
+from core.logger import get_logger
 from network.packet_system import PacketSystem
 from network.protocol import RemoteDeskMessage, MessageType
 from chat.message import ChatMessage
@@ -14,8 +14,8 @@ class ChatServer:
     Handles broadcasting chat messages to all connected clients.
     Integrates with the main `ConnectionManager` to get client sockets.
     """
-    def __init__(self, connection_manager: Any): # Avoid circular import with ConnectionManager
-        self.logger = Logger.get_logger()
+    def __init__(self, connection_manager: Any):  # Avoid circular import with ConnectionManager
+        self.logger = get_logger()
         self.connection_manager = connection_manager
         self.clients_lock = threading.Lock()
         self.logger.info("ChatServer initialized.")

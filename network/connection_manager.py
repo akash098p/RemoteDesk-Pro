@@ -17,7 +17,7 @@ from typing import Callable, Optional, Dict, Any, Tuple
 from network.socket_server import SocketServer
 from network.socket_client import SocketClient
 from network.protocol import RemoteDeskMessage, MessageType
-from core.logger import Logger
+from core.logger import get_logger
 
 # Import new communication modules
 from chat.manager import ChatManager
@@ -25,7 +25,7 @@ from chat.message import ChatMessage
 from chat.attachments import AttachmentManager
 from clipboard.manager import ClipboardManager
 
-logger = Logger.get_logger()
+logger = get_logger()
 
 
 class ConnectionManager:

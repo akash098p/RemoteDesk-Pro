@@ -1,12 +1,8 @@
 
-import threading
-import time
-from typing import List
+from typing import Any, List
 
 import customtkinter as ctk
-from core.constants import APP_VERSION, JSON_INDENT, JSON_SORT_KEYS
-from core.logger import Logger
-from core.config_manager import ConfigManager
+from core.logger import get_logger
 from chat.message import ChatMessage
 from chat.emoji import EmojiManager
 from chat.history import ChatHistoryManager
@@ -21,8 +17,9 @@ class ChatPage(ctk.CTkFrame):
     """
     def __init__(self, parent: ctk.CTk, app_controller: Any, **kwargs):
         super().__init__(parent, **kwargs)
-        self.logger = Logger.get_logger()
+        self.logger = get_logger()
         self.app_controller = app_controller  # Reference to main app controller (holds chat_manager, etc.)
+        self._username = getattr(app_controller, "username", "Local")
 
         # Initialize local components for display/tests until app_controller.chat_manager is set
         self.emoji_manager = EmojiManager()
@@ -86,7 +83,6 @@ class ChatPage(ctk.CTkFrame):
             text="😊",
             width=40,
             command=self._toggle_emoji_picker,
-            tooltip="Insert Emoji"
         )
         self.emoji_button.pack(side="left", padx=5, pady=5)
 
@@ -96,7 +92,6 @@ class ChatPage(ctk.CTkFrame):
             text="📎",
             width=40,
             command=self._open_file_dialog,
-            tooltip="Attach File"
         )
         self.attachment_button.pack(side="left", padx=5, pady=5)
 
@@ -206,7 +201,7 @@ class ChatPage(ctk.CTkFrame):
         else:
             # Fallback to local component if not integrated yet
             self.logger.warning("App controller not fully set up. Using local ChatHistoryManager.")
-            msg = ChatMessage(sender=self._username or "Local", content=content)
+            msg = ChatMessage(sender=getattr(self, '_username', 'Local'), content=content)
             self.chat_history_manager.add_message(msg)
             self._display_message(msg)
 

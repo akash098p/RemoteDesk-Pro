@@ -205,6 +205,97 @@ class ThemeManager:
             else:
                 logger.warning(f"Custom font file not found: {font_path.name}")
 
+    def _build_customtk_theme(self, theme_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Build a CustomTkinter theme dictionary from our simple theme colors."""
+        default_theme: Dict[str, Any] = {}
+        if hasattr(customtkinter, "ThemeManager") and hasattr(customtkinter.ThemeManager, "theme"):
+            default_theme = dict(customtkinter.ThemeManager.theme)
+
+        primary = theme_data.get("primary", "#0084FF")
+        primary_hover = theme_data.get("primary_hover", primary)
+        background = theme_data.get("background", "#0D0D0D")
+        card_bg = theme_data.get("card_bg", theme_data.get("card", "#252525"))
+        surface = theme_data.get("surface", card_bg)
+        surface_hover = theme_data.get("surface_hover", theme_data.get("sidebar", "#252525"))
+        border = theme_data.get("border", "#333333")
+        text_primary = theme_data.get("text_primary", theme_data.get("text", "#FFFFFF"))
+        text_secondary = theme_data.get("text_secondary", theme_data.get("secondary_text", "#A0A0A0"))
+        text_on_primary = theme_data.get("text_on_primary", text_primary)
+
+        theme: Dict[str, Any] = dict(default_theme)
+        theme["CTk"] = {
+            **default_theme.get("CTk", {}),
+            "fg_color": [background, background],
+            "text_color": [text_primary, text_primary],
+            "border_color": [border, border],
+        }
+        theme["CTkFrame"] = {
+            **default_theme.get("CTkFrame", {}),
+            "fg_color": [surface, surface],
+            "border_color": [border, border],
+            "border_width": 0,
+            "corner_radius": default_theme.get("CTkFrame", {}).get("corner_radius", 10),
+        }
+        theme["CTkButton"] = {
+            **default_theme.get("CTkButton", {}),
+            "fg_color": [primary, primary],
+            "hover_color": [primary_hover, primary_hover],
+            "text_color": [text_on_primary, text_on_primary],
+            "border_color": [border, border],
+            "border_width": 0,
+            "corner_radius": default_theme.get("CTkButton", {}).get("corner_radius", 8),
+        }
+        theme["CTkLabel"] = {
+            **default_theme.get("CTkLabel", {}),
+            "fg_color": "transparent",
+            "text_color": [text_primary, text_primary],
+            "border_color": [border, border],
+            "border_width": default_theme.get("CTkLabel", {}).get("border_width", 0),
+            "corner_radius": default_theme.get("CTkLabel", {}).get("corner_radius", 0),
+        }
+        theme["CTkEntry"] = {
+            **default_theme.get("CTkEntry", {}),
+            "fg_color": [surface, surface],
+            "border_color": [border, border],
+            "text_color": [text_primary, text_primary],
+            "placeholder_text_color": [text_secondary, text_secondary],
+            "border_width": default_theme.get("CTkEntry", {}).get("border_width", 1),
+        }
+        theme["CTkTextbox"] = {
+            **default_theme.get("CTkTextbox", {}),
+            "fg_color": [surface, surface],
+            "border_color": [border, border],
+            "text_color": [text_primary, text_primary],
+            "border_width": default_theme.get("CTkTextbox", {}).get("border_width", 1),
+        }
+        theme["CTkOptionMenu"] = {
+            **default_theme.get("CTkOptionMenu", {}),
+            "fg_color": [surface, surface],
+            "hover_color": [surface_hover, surface_hover],
+            "text_color": [text_primary, text_primary],
+            "border_color": [border, border],
+            "border_width": default_theme.get("CTkOptionMenu", {}).get("border_width", 1),
+        }
+        theme["CTkSlider"] = {
+            **default_theme.get("CTkSlider", {}),
+            "button_color": [primary, primary],
+            "progress_color": [primary, primary],
+            "button_hover_color": [primary_hover, primary_hover],
+        }
+
+        return theme
+
+    def _write_customtk_theme_file(self, theme_name: str, theme_data: Dict[str, Any]) -> Path:
+        """Write the generated CustomTkinter theme JSON to a file and return its path."""
+        theme_file = THEMES_DIR / f"{theme_name}.ctk.json"
+        try:
+            with theme_file.open("w", encoding="utf-8") as f:
+                json.dump(theme_data, f, indent=2)
+            logger.debug(f"Wrote CustomTkinter theme file: {theme_file}")
+        except Exception as e:
+            logger.error(f"Failed to write CustomTkinter theme file {theme_file}: {e}")
+        return theme_file
+
     def set_theme(self, theme_name: str, initial_load: bool = False) -> None:
         """
         Sets the active application theme.
@@ -225,22 +316,26 @@ class ThemeManager:
         self._current_theme_data = self._load_theme_data(theme_name)
         
         # Apply CustomTkinter theme settings
-        # CustomTkinter expects 'colors' dict with specific keys
-        ctk_theme = {"CTk": {"colors": self._current_theme_data}}
+        appearance_mode = "light" if theme_name == "light" else "dark"
         try:
-            if hasattr(customtkinter, "set_widget_style"):
-                customtkinter.set_widget_style(ctk_theme)
-
-            if hasattr(customtkinter, "set_default_color_theme") and theme_name not in {"dark", "light"}:
-                try:
-                    customtkinter.set_default_color_theme(theme_name)
-                except Exception as e:
-                    logger.debug(f"Skipping set_default_color_theme for theme '{theme_name}': {e}")
+            if hasattr(customtkinter, "set_default_color_theme"):
+                if theme_name in {"dark", "light"}:
+                    try:
+                        customtkinter.set_default_color_theme(theme_name)
+                    except Exception as e:
+                        logger.debug(f"Skipping default CTk theme for '{theme_name}': {e}")
+                else:
+                    ctk_theme_data = self._build_customtk_theme(self._current_theme_data)
+                    theme_file = self._write_customtk_theme_file(theme_name, ctk_theme_data)
+                    try:
+                        customtkinter.set_default_color_theme(str(theme_file))
+                    except Exception as e:
+                        logger.debug(f"Failed to apply custom theme file '{theme_file}': {e}")
 
             if hasattr(customtkinter, "set_appearance_mode"):
-                customtkinter.set_appearance_mode(theme_name)
+                customtkinter.set_appearance_mode(appearance_mode)
 
-            logger.info(f"Successfully applied theme: {theme_name}")
+            logger.info(f"Successfully applied theme: {theme_name} (appearance mode: {appearance_mode})")
             
             if not initial_load:
                 config_manager.set_value("config", "theme", theme_name)

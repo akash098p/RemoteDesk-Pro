@@ -2,7 +2,7 @@
 import threading
 from typing import Callable, Any, Optional
 
-from core.logger import Logger
+from core.logger import get_logger
 from network.packet_system import PacketSystem
 from network.protocol import RemoteDeskMessage, MessageType
 from clipboard.watcher import ClipboardWatcher
@@ -14,7 +14,7 @@ class ClipboardManager:
     and also updates the local clipboard with remote changes.
     """
     def __init__(self, connection_manager: Any):
-        self.logger = Logger.get_logger()
+        self.logger = get_logger()
         self.connection_manager = connection_manager
         self.clipboard_watcher: Optional[ClipboardWatcher] = None
         self.is_server_mode = False

@@ -103,6 +103,20 @@ class Sidebar(customtkinter.CTkFrame):
                 "icon_size": 24
             },
             {
+                "key": "chat",
+                "icon": "chat.svg",
+                "text": "Chat",
+                "hover_text": "Team Messaging",
+                "icon_size": 24
+            },
+            {
+                "key": "clipboard",
+                "icon": "clipboard.svg",
+                "text": "Clipboard",
+                "hover_text": "Clipboard Sync",
+                "icon_size": 24
+            },
+            {
                 "key": "settings",
                 "icon": "settings.svg",
                 "text": "Settings",

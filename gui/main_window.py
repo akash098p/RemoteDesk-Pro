@@ -94,6 +94,8 @@ class MainWindow(customtkinter.CTk):
         self.config_manager = config_manager
         self._theme_manager = get_theme_manager()
         self._navigation_manager: NavigationManager | None = None
+        self._chat_page: "ChatPage" | None = None
+        self.username = self.config_manager.get_value("config", "username", "Local")
         self._is_running = False
 
         # Initialize
@@ -161,16 +163,21 @@ class MainWindow(customtkinter.CTk):
         from gui.pages.logs import LogsPage
         from gui.pages.about import AboutPage
         from gui.pages.connection import ConnectionPage
+        from gui.pages.chat import ChatPage
+        from gui.pages.clipboard import ClipboardPage
 
         # Create navigation manager
         self._navigation_manager = NavigationManager(self, self.sidebar)
 
         # Register pages
         self._navigation_manager.register_page("dashboard", DashboardPage(self))
+        self._navigation_manager.register_page("connection", ConnectionPage(self))
+        self._chat_page = ChatPage(self, app_controller=self)
+        self._navigation_manager.register_page("chat", self._chat_page)
+        self._navigation_manager.register_page("clipboard", ClipboardPage(self))
         self._navigation_manager.register_page("settings", SettingsPage(self))
         self._navigation_manager.register_page("logs", LogsPage(self))
         self._navigation_manager.register_page("about", AboutPage(self))
-        self._navigation_manager.register_page("connection", ConnectionPage(self))
 
         # Show dashboard
         self._navigation_manager.show_page("dashboard")
@@ -186,6 +193,28 @@ class MainWindow(customtkinter.CTk):
         new_theme = "light" if current == "dark" else "dark"
         self._theme_manager.set_theme(new_theme)
         self.config_manager.set_value("config", "theme", new_theme)
+
+    def send_chat_message(self, content: str) -> None:
+        """Send a chat message through the app controller.
+
+        Falls back to local display if chat networking is not available yet.
+        """
+        if self._chat_page is None:
+            return
+
+        try:
+            # Future integration point for a dedicated ChatManager
+            if hasattr(self, "chat_manager") and getattr(self, "chat_manager") is not None:
+                self.chat_manager.send_message(content)
+                return
+        except Exception:
+            pass
+
+        # Local fallback display
+        from chat.message import ChatMessage
+
+        message = ChatMessage(sender=self.username, content=content)
+        self._chat_page.update_message_display(message)
 
     def run(self) -> None:
         """Start the application main loop."""

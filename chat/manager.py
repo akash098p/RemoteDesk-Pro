@@ -2,7 +2,7 @@
 import threading
 from typing import Callable, Any, Optional
 
-from core.logger import Logger
+from core.logger import get_logger
 from chat.message import ChatMessage
 from chat.client import ChatClient
 # from chat.server import ChatServer # Will be passed from connection_manager
@@ -18,7 +18,7 @@ class ChatManager:
                  on_new_message_callback: Callable[[ChatMessage], None], 
                  username: str = "User"): # Default username
         
-        self.logger = Logger.get_logger()
+        self.logger = get_logger()
         self.connection_manager = connection_manager
         self.on_new_message_callback = on_new_message_callback
         self.username = username

@@ -3,13 +3,13 @@ import threading
 import time
 from typing import Callable, Optional
 
-from core.logger import Logger
+from core.logger import get_logger
 
 # Try to import pyperclip, if not available, provide a mock or raise an error
 try:
     import pyperclip
 except ImportError:
-    Logger.get_logger().warning("pyperclip not found. ClipboardWatcher will not function. Please install with 'pip install pyperclip'.")
+    get_logger().warning("pyperclip not found. ClipboardWatcher will not function. Please install with 'pip install pyperclip'.")
     pyperclip = None
 
 class ClipboardWatcher:
@@ -18,7 +18,7 @@ class ClipboardWatcher:
     This is a platform-specific component.
     """
     def __init__(self, on_clipboard_change: Callable[[str], None], interval: float = 1.0):
-        self.logger = Logger.get_logger()
+        self.logger = get_logger()
         self.on_clipboard_change = on_clipboard_change
         self.interval = interval  # How often to check the clipboard in seconds
         self._stop_event = threading.Event()

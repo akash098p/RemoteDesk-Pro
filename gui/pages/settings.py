@@ -25,9 +25,12 @@ class SettingsPage(customtkinter.CTkFrame):
     def __init__(self, parent: "MainWindow") -> None:
         super().__init__(parent, fg_color="transparent")
         self.parent = parent
+        self.theme_manager = theme_manager
+        self.config_manager = config_manager
         
-        # Load current settings
-        self._settings = config_manager.get_config("settings")
+        # Load current settings and theme
+        self._settings = self.config_manager.get_config("settings")
+        self.theme_var = customtkinter.StringVar(value=self.theme_manager.current_theme_name)
         
         # Create UI
         self._create_widgets()
@@ -36,7 +39,7 @@ class SettingsPage(customtkinter.CTkFrame):
         if new_theme is None:
             new_theme = self.theme_var.get()
         self.theme_manager.set_theme(new_theme)
-        self.config_manager.set_value("settings", "theme", new_theme)
+        self.config_manager.set_value("config", "theme", new_theme)
     
     def _on_font_change(self, new_font_size: str) -> None:
         size = int(new_font_size)
@@ -72,11 +75,10 @@ class SettingsPage(customtkinter.CTkFrame):
         )
         theme_label.pack(side="left", padx=(0, 10))
         
-        self.theme_var = customtkinter.StringVar(value=self._settings.get("theme", "dark"))
         self.theme_dropdown = customtkinter.CTkOptionMenu(
             theme_frame, 
             variable=self.theme_var,
-            values=["dark", "light", "nord", "dracula", "amoled"],
+            values=list(theme_manager.available_themes),
             command=lambda new_theme: self._on_theme_change(new_theme)
         )
         self.theme_dropdown.pack(side="left")

@@ -4,7 +4,7 @@ import socket
 import json
 from typing import Callable, Optional
 
-from core.logger import Logger
+from core.logger import get_logger
 from network.packet_system import PacketSystem
 from network.protocol import RemoteDeskMessage, MessageType
 from chat.message import ChatMessage
@@ -12,11 +12,13 @@ from chat.message import ChatMessage
 class ChatClient:
     """
     Manages sending and receiving chat messages on the client side.
-    """\n    def __init__(self, 
-                 client_socket: socket.socket, 
-                 on_message_received: Callable[[ChatMessage], None], 
-                 username: str = "Guest"):
-        self.logger = Logger.get_logger()
+    """\n    def __init__(
+        self,
+        client_socket: socket.socket,
+        on_message_received: Callable[[ChatMessage], None],
+        username: str = "Guest",
+    ):
+        self.logger = get_logger()
         self.client_socket = client_socket
         self.on_message_received = on_message_received
         self.username = username

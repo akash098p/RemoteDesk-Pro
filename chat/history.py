@@ -1,7 +1,7 @@
 
 from typing import List
 from chat.message import ChatMessage
-from core.logger import Logger
+from core.logger import get_logger
 
 class ChatHistoryManager:
     """
@@ -9,7 +9,7 @@ class ChatHistoryManager:
     and potentially persist messages.
     """
     def __init__(self, max_history_size: int = 100):
-        self.logger = Logger.get_logger()
+        self.logger = get_logger()
         self._messages: List[ChatMessage] = []
         self.max_history_size = max_history_size
         self.logger.info(f"ChatHistoryManager initialized with max size: {self.max_history_size}")

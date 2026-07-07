@@ -66,16 +66,35 @@ def load_image(image_name: str, path: Path = ICONS_DIR, size: Tuple[int, int] = 
         A CTkImage object if successful, None otherwise.
     """
     image_path = path / image_name
+
     if not image_path.exists():
-        logger.warning(f"Image file not found: {image_path}")
-        return None
+        # If the requested image is SVG and a PNG replacement exists, try that first.
+        if image_path.suffix.lower() == ".svg":
+            png_fallback = image_path.with_suffix(".png")
+            if png_fallback.exists():
+                image_path = png_fallback
+                logger.debug(f"Falling back to PNG icon for SVG reference: {png_fallback.name}")
+            else:
+                logger.warning(f"Image file not found: {image_path}")
+                return None
+        else:
+            png_fallback = image_path.with_suffix(".png")
+            if png_fallback.exists():
+                image_path = png_fallback
+                logger.debug(f"Falling back to PNG icon: {png_fallback.name}")
+            else:
+                logger.warning(f"Image file not found: {image_path}")
+                return None
 
     try:
-        # CustomTkinter does not reliably support SVG through PIL in this environment.
-        # Use raster images only, and skip SVGs if Pillow cannot identify them.
         if image_path.suffix.lower() == ".svg":
-            logger.warning(f"Skipping SVG image loading for unsupported format: {image_path}")
-            return None
+            png_fallback = image_path.with_suffix(".png")
+            if png_fallback.exists():
+                image_path = png_fallback
+                logger.debug(f"Using PNG fallback for unsupported SVG image: {png_fallback.name}")
+            else:
+                logger.warning(f"Skipping SVG image loading for unsupported format: {image_path}")
+                return None
 
         pil_image = Image.open(image_path)
         pil_image = pil_image.resize(size, Image.LANCZOS)

@@ -1,7 +1,7 @@
 
 import json
 from typing import Dict
-from core.logger import Logger
+from core.logger import get_logger
 
 class EmojiManager:
     """
@@ -9,7 +9,7 @@ class EmojiManager:
     actual emoji characters and potentially custom emoji handling.
     """
     def __init__(self):
-        self.logger = Logger.get_logger()
+        self.logger = get_logger()
         # A simple example mapping; in a real app, this would be more extensive
         # and potentially loaded from a configuration file.
         self.emoji_map: Dict[str, str] = {

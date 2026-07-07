@@ -3,7 +3,7 @@ import os
 import threading
 from typing import Dict, Any, Callable, Optional
 
-from core.logger import Logger
+from core.logger import get_logger
 from network.packet_system import PacketSystem
 from network.protocol import RemoteDeskMessage, MessageType
 
@@ -14,7 +14,7 @@ class AttachmentManager:
     CHUNK_SIZE = 4096 # Size of data chunks to send/receive
 
     def __init__(self, connection_manager: Any, download_dir: str = "downloads"):
-        self.logger = Logger.get_logger()
+        self.logger = get_logger()
         self.connection_manager = connection_manager
         self.download_dir = download_dir
         os.makedirs(self.download_dir, exist_ok=True)

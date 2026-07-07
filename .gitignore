@@ -34,4 +34,5 @@ downloads/
 Thumbs.db
 .DS_Store
 
-.aionrs
+# AI agent
+.aionrs/
