@@ -37,6 +37,9 @@ if TYPE_CHECKING:
     from gui.pages.logs import LogsPage
     from gui.pages.about import AboutPage
     from gui.pages.connection import ConnectionPage
+    from gui.pages.chat import ChatPage
+    from gui.pages.clipboard import ClipboardPage
+    from gui.pages.screen import ScreenPage
 
 
 class NavigationManager:

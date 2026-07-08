@@ -14,7 +14,6 @@ from tkinter import TclError
 from core.config_manager import get_config_manager
 from gui.main_window import create_main_window
 
-
 def main() -> None:
     try:
         # Set up configuration
