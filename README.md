@@ -373,6 +373,5 @@ If you like this project,
 
 💡 Suggest features
 
-🤝 Contribute
 
 ---
