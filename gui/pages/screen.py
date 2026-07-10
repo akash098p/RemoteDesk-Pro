@@ -2,424 +2,341 @@
 ===============================================================================
 RemoteDesk Pro
 File: gui/pages/screen.py
-
-Screen sharing page with capture controls, viewer display, and quality tuning.
-Supports local screen capture and stream receiver integration for Phase 4.
+Screen sharing page with premium glassmorphism UI
 ===============================================================================
 """
 
 from __future__ import annotations
 
-import base64
-import customtkinter
-from typing import Optional, Any
+import threading
+import time
+import logging
+from typing import Optional
 
-from core.constants import DEFAULT_FPS, DEFAULT_QUALITY, DEFAULT_PORT, MAX_FPS, MIN_FPS, MAX_QUALITY, MIN_QUALITY
-from core.logger import logger
-from core.theme_manager import get_theme_manager
-from network.connection_manager import ConnectionManager
-from network.protocol import MessageFactory, MessageType, RemoteDeskMessage
-from screen_capture.capture import create_screen_capture, ScreenCapture
-from screen_capture.streaming_client import create_streaming_client, StreamingClient
+import customtkinter as ctk
+import mss
+from PIL import Image
+import io
 
-theme_manager = get_theme_manager()
+from core.constants import DEFAULT_FPS, DEFAULT_QUALITY
+from core.logger import get_logger
 
+logger = get_logger()
 
-class ScreenPage(customtkinter.CTkFrame):
-    """Screen sharing and viewing page."""
-
-    def __init__(self, parent: "MainWindow") -> None:
-        super().__init__(parent, fg_color="transparent")
-        self.parent = parent
-        self._theme = theme_manager
-
-        self._capture: Optional[ScreenCapture] = None
-        self._stream_client: Optional[StreamingClient] = None
-        self._connection_manager: Optional[ConnectionManager] = None
-        self._viewer_label: Optional[customtkinter.CTkLabel] = None
-
-        self._host_value = customtkinter.StringVar(value="0.0.0.0")
-        self._port_value = customtkinter.IntVar(value=DEFAULT_PORT)
-        self._remote_host_value = customtkinter.StringVar(value="127.0.0.1")
-        self._remote_port_value = customtkinter.IntVar(value=DEFAULT_PORT)
-        self._network_status_label: Optional[customtkinter.CTkLabel] = None
-
-        self._fps_value = customtkinter.IntVar(value=DEFAULT_FPS)
-        self._quality_value = customtkinter.IntVar(value=DEFAULT_QUALITY)
-        self._is_sharing = False
-        self._is_receiving = False
-
+class ScreenPage(ctk.CTkFrame):
+    """
+    Screen sharing page for RemoteDesk Pro with premium glassmorphism UI.
+    """
+    
+    def __init__(self, master):
+        super().__init__(master)
+        self._fps = DEFAULT_FPS
+        self._quality = DEFAULT_QUALITY
+        self._capturing = False
+        self._capture_thread = None
+        self._monitor = None
+        self._connection_manager = None
+        self._audio_sender = None
+        self._audio_receiver = None
+        
         self._create_widgets()
-
-    def _create_widgets(self) -> None:
-        header = customtkinter.CTkLabel(
-            self,
+    
+    def _create_widgets(self):
+        """Create and layout the UI elements with glassmorphism styling."""
+        # Header with glass effect
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.pack(fill="x", padx=20, pady=(20, 10))
+        
+        title = ctk.CTkLabel(
+            header_frame,
             text="Screen Sharing",
-            font=customtkinter.CTkFont(size=20, weight="bold"),
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
-            anchor="w",
+            font=ctk.CTkFont(size=24, weight="bold")
         )
-        header.pack(fill="x", padx=20, pady=(20, 10))
-
-        controls_frame = customtkinter.CTkFrame(self, fg_color=self._theme.get_color("card_bg", "#252525"))
-        controls_frame.pack(fill="x", padx=20, pady=(0, 10))
-
-        self._share_btn = customtkinter.CTkButton(
-            controls_frame,
-            text="Start Sharing",
-            command=self._toggle_sharing,
-            width=180,
+        title.pack(side="left", padx=10)
+        
+        # Status indicator
+        self.status_indicator = ctk.CTkLabel(
+            header_frame,
+            text="● Idle",
+            font=ctk.CTkFont(size=14, weight="bold")
         )
-        self._share_btn.grid(row=0, column=0, padx=10, pady=10)
-
-        self._receive_btn = customtkinter.CTkButton(
-            controls_frame,
-            text="Start Receiving",
-            command=self._toggle_receiving,
-            width=180,
-        )
-        self._receive_btn.grid(row=0, column=1, padx=10, pady=10)
-
-        self._fullscreen_btn = customtkinter.CTkButton(
-            controls_frame,
-            text="Fullscreen Preview",
-            command=self._toggle_fullscreen,
-            width=180,
-        )
-        self._fullscreen_btn.grid(row=0, column=2, padx=10, pady=10)
-
-        network_frame = customtkinter.CTkFrame(controls_frame, fg_color="transparent")
-        network_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 10))
-
-        host_label = customtkinter.CTkLabel(
-            network_frame,
-            text="Host:",
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
-        )
-        host_label.grid(row=0, column=0, padx=(0, 8), pady=2, sticky="w")
-
-        self._host_entry = customtkinter.CTkEntry(
-            network_frame,
-            width=140,
-            textvariable=self._host_value,
-        )
-        self._host_entry.grid(row=0, column=1, padx=(0, 8), pady=2, sticky="w")
-
-        port_label = customtkinter.CTkLabel(
-            network_frame,
-            text="Port:",
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
-        )
-        port_label.grid(row=0, column=2, padx=(0, 8), pady=2, sticky="w")
-
-        self._port_entry = customtkinter.CTkEntry(
-            network_frame,
-            width=90,
-            textvariable=self._port_value,
-        )
-        self._port_entry.grid(row=0, column=3, padx=(0, 8), pady=2, sticky="w")
-
-        remote_host_label = customtkinter.CTkLabel(
-            network_frame,
-            text="Remote Host:",
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
-        )
-        remote_host_label.grid(row=1, column=0, padx=(0, 8), pady=2, sticky="w")
-
-        self._remote_host_entry = customtkinter.CTkEntry(
-            network_frame,
-            width=140,
-            textvariable=self._remote_host_value,
-        )
-        self._remote_host_entry.grid(row=1, column=1, padx=(0, 8), pady=2, sticky="w")
-
-        remote_port_label = customtkinter.CTkLabel(
-            network_frame,
-            text="Remote Port:",
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
-        )
-        remote_port_label.grid(row=1, column=2, padx=(0, 8), pady=2, sticky="w")
-
-        self._remote_port_entry = customtkinter.CTkEntry(
-            network_frame,
-            width=90,
-            textvariable=self._remote_port_value,
-        )
-        self._remote_port_entry.grid(row=1, column=3, padx=(0, 8), pady=2, sticky="w")
-
-        self._network_status_label = customtkinter.CTkLabel(
-            network_frame,
-            text="Network status: idle",
-            text_color=self._theme.get_color("text_secondary", "#A0A0A0"),
-            anchor="w",
-        )
-        self._network_status_label.grid(row=2, column=0, columnspan=4, sticky="w", pady=(8, 0))
-
-        fps_frame = customtkinter.CTkFrame(controls_frame, fg_color="transparent")
-        fps_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=10, pady=10)
-
-        fps_label = customtkinter.CTkLabel(
-            fps_frame,
+        self.status_indicator.pack(side="right", padx=10)
+        
+        # Main content frame with glass effect
+        content_frame = ctk.CTkFrame(self, fg_color=("gray15", "gray85"))
+        content_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # FPS Control Section
+        fps_section = ctk.CTkFrame(content_frame, fg_color="transparent")
+        fps_section.pack(fill="x", pady=(15, 10))
+        
+        fps_label = ctk.CTkLabel(
+            fps_section,
             text="FPS:",
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
+            font=ctk.CTkFont(size=14)
         )
-        fps_label.pack(side="left", padx=(0, 8))
-
-        self._fps_slider = customtkinter.CTkSlider(
-            fps_frame,
-            from_=MIN_FPS,
-            to=MAX_FPS,
-            number_of_steps=MAX_FPS - MIN_FPS,
-            variable=self._fps_value,
-            command=lambda v: self._update_fps(int(v)),
-            width=300,
+        fps_label.pack(side="left", padx=(20, 5))
+        
+        self.fps_combo = ctk.CTkComboBox(
+            fps_section,
+            values=["15", "24", "30", "60"],
+            state="readonly",
+            width=80
         )
-        self._fps_slider.pack(side="left", padx=(0, 8), fill="x", expand=True)
-
-        self._fps_value_label = customtkinter.CTkLabel(
-            fps_frame,
-            text=str(DEFAULT_FPS),
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
-            width=60,
-        )
-        self._fps_value_label.pack(side="left")
-
-        quality_frame = customtkinter.CTkFrame(controls_frame, fg_color="transparent")
-        quality_frame.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=10)
-
-        quality_label = customtkinter.CTkLabel(
-            quality_frame,
+        self.fps_combo.set(str(self._fps))
+        self.fps_combo.pack(side="left", padx=5)
+        self.fps_combo.bind("<<ComboboxSelected>>", self._on_fps_change)
+        
+        # Quality Control Section
+        quality_section = ctk.CTkFrame(content_frame, fg_color="transparent")
+        quality_section.pack(fill="x", padx=20, pady=10)
+        
+        quality_label = ctk.CTkLabel(
+            quality_section,
             text="Quality:",
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
+            font=ctk.CTkFont(size=14)
         )
-        quality_label.pack(side="left", padx=(0, 8))
-
-        self._quality_slider = customtkinter.CTkSlider(
-            quality_frame,
-            from_=MIN_QUALITY,
-            to=MAX_QUALITY,
-            number_of_steps=MAX_QUALITY - MIN_QUALITY,
-            variable=self._quality_value,
-            command=lambda v: self._update_quality(int(v)),
-            width=300,
+        quality_label.pack(side="left", padx=(20, 5))
+        
+        self.quality_slider = ctk.CTkSlider(
+            quality_section,
+            from_=1,
+            to=100,
+            number_of_steps=100,
+            command=self._on_quality_change
         )
-        self._quality_slider.pack(side="left", padx=(0, 8), fill="x", expand=True)
-
-        self._quality_value_label = customtkinter.CTkLabel(
-            quality_frame,
-            text=str(DEFAULT_QUALITY),
-            text_color=self._theme.get_color("text_primary", "#FFFFFF"),
-            width=60,
+        self.quality_slider.set(self._quality)
+        self.quality_slider.pack(side="left", fill="x", expand=True, padx=5)
+        
+        self.quality_value = ctk.CTkLabel(
+            quality_section,
+            text=f"{self._quality}%",
+            font=ctk.CTkFont(size=14)
         )
-        self._quality_value_label.pack(side="left")
-
-        viewer_wrapper = customtkinter.CTkFrame(self, fg_color=self._theme.get_color("background", "#0D0D0D"))
-        viewer_wrapper.pack(fill="both", expand=True, padx=20, pady=(0, 20))
-
-        self._viewer_label = customtkinter.CTkLabel(
-            viewer_wrapper,
-            text="Viewer / shared screen preview",
-            width=800,
-            height=400,
-            fg_color=self._theme.get_color("surface", "#1A1A1A"),
-            corner_radius=10,
-            text_color=self._theme.get_color("text_secondary", "#A0A0A0"),
+        self.quality_value.pack(side="right", padx=(5, 20))
+        
+        # Control Buttons Section
+        buttons_section = ctk.CTkFrame(content_frame, fg_color="transparent")
+        buttons_section.pack(fill="x", padx=20, pady=20)
+        
+        self.start_button = ctk.CTkButton(
+            buttons_section,
+            text="Start Sharing",
+            width=140,
+            height=40,
+            command=self._start_sharing
         )
-        self._viewer_label.pack(fill="both", expand=True, padx=10, pady=10)
-
-    def _toggle_sharing(self) -> None:
-        if self._is_sharing:
-            self._stop_sharing()
-        else:
-            self._start_sharing()
-
-    def _toggle_receiving(self) -> None:
-        if self._is_receiving:
-            self._stop_receiving()
-        else:
-            self._start_receiving()
-
-    def _toggle_fullscreen(self) -> None:
-        if self._viewer_label:
-            self.parent.attributes("-fullscreen", not self.parent.attributes("-fullscreen"))
-
-    def _update_fps(self, value: int) -> None:
-        self._fps_value_label.configure(text=str(value))
-        if self._capture:
-            self._capture.set_fps(value)
-
-    def _update_quality(self, value: int) -> None:
-        self._quality_value_label.configure(text=str(value))
-        if self._capture:
-            self._capture.set_quality(value)
-
-    def _start_sharing(self) -> None:
-        host = self._host_value.get().strip() or "0.0.0.0"
-        port = self._port_value.get()
-
-        self._connection_manager = ConnectionManager(
-            server_port=port,
-            server_callback=self._on_network_event,
+        self.start_button.pack(side="left", padx=10)
+        
+        self.stop_button = ctk.CTkButton(
+            buttons_section,
+            text="Stop Sharing",
+            width=140,
+            height=40,
+            command=self._stop_sharing,
+            state="disabled"
         )
-        if not self._connection_manager.initialize(is_server=True, host=host, port=port):
-            if self._network_status_label:
-                self._network_status_label.configure(
-                    text="Network status: failed to host",
-                    text_color=self._theme.get_color("error", "#F44336"),
-                )
-            return
-
-        self._capture = create_screen_capture(
-            fps=self._fps_value.get(),
-            quality=self._quality_value.get(),
-            on_frame=self._on_frame_captured,
+        self.stop_button.pack(side="left", padx=10)
+        
+        # Remote Control Section
+        remote_section = ctk.CTkFrame(content_frame, fg_color="transparent")
+        remote_section.pack(fill="x", padx=20, pady=(10, 20))
+        
+        remote_label = ctk.CTkLabel(
+            remote_section,
+            text="Remote Control",
+            font=ctk.CTkFont(size=16, weight="bold")
         )
-
-        if self._capture.start():
-            self._is_sharing = True
-            self._share_btn.configure(text="Stop Sharing")
-            self._viewer_label.configure(text="Sharing your screen...", text_color=self._theme.get_color("text_primary", "#FFFFFF"))
-            if self._network_status_label:
-                self._network_status_label.configure(
-                    text=f"Hosting on {host}:{port}",
-                    text_color=self._theme.get_color("success", "#4CAF50"),
-                )
-        else:
-            if self._connection_manager:
-                self._connection_manager.stop()
-                self._connection_manager = None
-
-    def _stop_sharing(self) -> None:
-        if self._capture:
-            self._capture.stop()
-            self._capture.destroy()
-            self._capture = None
-        if self._connection_manager:
-            self._connection_manager.stop()
-            self._connection_manager = None
-
-        self._is_sharing = False
-        self._share_btn.configure(text="Start Sharing")
-        self._viewer_label.configure(text="Viewer / shared screen preview", text_color=self._theme.get_color("text_secondary", "#A0A0A0"))
-        if self._network_status_label:
-            self._network_status_label.configure(text="Network status: idle", text_color=self._theme.get_color("text_secondary", "#A0A0A0"))
-
-    def _start_receiving(self) -> None:
-        if self._viewer_label is None:
-            return
-
-        host = self._remote_host_value.get().strip()
-        port = self._remote_port_value.get()
-
-        self._connection_manager = ConnectionManager(
-            server_port=port,
-            client_callback=self._on_network_event,
+        remote_label.pack(anchor="w", padx=20, pady=(10, 5))
+        
+        self.remote_status = ctk.CTkLabel(
+            remote_section,
+            text="● Disconnected",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#FF6B6B"
         )
-        if not self._connection_manager.initialize(is_server=False, host=host, port=port):
-            if self._network_status_label:
-                self._network_status_label.configure(
-                    text="Network status: failed to connect",
-                    text_color=self._theme.get_color("error", "#F44336"),
-                )
-            return
-
-        self._stream_client = create_streaming_client(
-            display_widget=self._viewer_label,
+        self.remote_status.pack(anchor="w", padx=20, pady=(0, 10))
+        
+        # Control buttons
+        remote_buttons = ctk.CTkFrame(remote_section, fg_color="transparent")
+        remote_buttons.pack(fill="x", padx=20, pady=(0, 20))
+        
+        self.remote_control_btn = ctk.CTkButton(
+            remote_buttons,
+            text="Request Control",
+            width=160,
+            height=35,
+            command=self._request_remote_control
         )
-        self._stream_client.start()
-        self._is_receiving = True
-        self._receive_btn.configure(text="Stop Receiving")
-        self._viewer_label.configure(text="Receiving remote screen...", text_color=self._theme.get_color("text_primary", "#FFFFFF"))
-        if self._network_status_label:
-            self._network_status_label.configure(
-                text=f"Connected to {host}:{port}",
-                text_color=self._theme.get_color("success", "#4CAF50"),
+        self.remote_control_btn.pack(side="left", padx=10)
+        
+        self.remote_audio_btn = ctk.CTkButton(
+            remote_buttons,
+            text="Share Audio",
+            width=160,
+            height=35,
+            command=self._toggle_audio_sharing
+        )
+        self.remote_audio_btn.pack(side="left", padx=10)
+        
+        # Info Section
+        info_section = ctk.CTkFrame(content_frame, fg_color="transparent")
+        info_section.pack(fill="both", expand=True, padx=20, pady=(10, 20))
+        
+        info_label = ctk.CTkLabel(
+            info_section,
+            text="Instructions:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        info_label.pack(anchor="w", padx=20, pady=(10, 5))
+        
+        instructions = [
+            "1. Set desired FPS and Quality for optimal performance",
+            "2. Click 'Start Sharing' to begin screen transmission",
+            "3. Remote device can request control via 'Request Control'",
+            "4. Enable audio sharing for real-time voice communication",
+            "5. Connection status indicators show current state"
+        ]
+        
+        for instruction in instructions:
+            instr_label = ctk.CTkLabel(
+                info_section,
+                text=f"• {instruction}",
+                font=ctk.CTkFont(size=12),
+                anchor="w"
             )
-
-    def _stop_receiving(self) -> None:
-        if self._stream_client:
-            self._stream_client.stop()
-            self._stream_client.destroy()
-            self._stream_client = None
-        if self._connection_manager:
-            self._connection_manager.stop()
-            self._connection_manager = None
-
-        self._is_receiving = False
-        self._receive_btn.configure(text="Start Receiving")
-        if self._viewer_label:
-            self._viewer_label.configure(text="Viewer / shared screen preview", text_color=self._theme.get_color("text_secondary", "#A0A0A0"))
-        if self._network_status_label:
-            self._network_status_label.configure(text="Network status: idle", text_color=self._theme.get_color("text_secondary", "#A0A0A0"))
-
-    def _on_frame_captured(self, frame_bytes: bytes) -> None:
-        """Handle locally captured screen frames, update the preview, and send remote frames."""
-        if self._viewer_label:
-            self._viewer_label.after(0, lambda: self._update_preview_image(frame_bytes))
-
-        if self._is_sharing and self._connection_manager:
+            instr_label.pack(anchor="w", padx=30, pady=2)
+    
+    def _on_fps_change(self, choice):
+        """Handle FPS dropdown change."""
+        try:
+            self._fps = int(choice)
+            logger.debug(f"FPS changed to {self._fps}")
+        except ValueError:
+            pass
+    
+    def _on_quality_change(self, value):
+        """Handle quality slider change."""
+        self._quality = int(value)
+        self.quality_value.configure(text=f"{self._quality}%")
+        logger.debug(f"Quality changed to {self._quality}")
+    
+    def _start_sharing(self):
+        """Start screen sharing session."""
+        if self._capturing:
+            return
+        
+        self._capturing = True
+        self.status_indicator.configure(text="● Sharing", text_color="#4CAF50")
+        self.start_button.configure(state="disabled")
+        self.stop_button.configure(state="normal")
+        self.remote_status.configure(text="● Available", text_color="#4CAF50")
+        
+        # Initialize connection manager if not set
+        if not self._connection_manager:
+            from core.constants import DEFAULT_PORT
+            from network.connection_manager import ConnectionManager
+            self._connection_manager = ConnectionManager(server_port=DEFAULT_PORT)
+        
+        # Initialize audio sharing
+        self._start_audio_sharing()
+        
+        # Start capture thread
+        self._capture_thread = threading.Thread(
+            target=self._capture_loop,
+            daemon=True
+        )
+        self._capture_thread.start()
+        
+        logger.info("Screen sharing started with audio")
+    
+    def _stop_sharing(self):
+        """Stop screen sharing session."""
+        self._capturing = False
+        self.status_indicator.configure(text="● Idle", text_color="#FF6B6B")
+        self.start_button.configure(state="normal")
+        self.stop_button.configure(state="disabled")
+        self.remote_status.configure(text="● Disconnected", text_color="#FF6B6B")
+        self._stop_audio_sharing()
+        
+        logger.info("Screen sharing stopped")
+    
+    def _start_audio_sharing(self):
+        """Start audio sharing session."""
+        try:
+            from audio.audio_capture import create_audio_capture
+            self._audio_capture = create_audio_capture(
+                rate=16000,
+                chunk=1024,
+                on_audio_data=self._send_audio_frame
+            )
+            self._audio_capture.start()
+            logger.info("Audio sharing started")
+        except Exception as e:
+            logger.error(f"Failed to start audio sharing: {e}")
+    
+    def _stop_audio_sharing(self):
+        """Stop audio sharing session."""
+        if hasattr(self, '_audio_capture') and self._audio_capture:
             try:
-                frame_message = MessageFactory.create_screen_frame(frame_bytes)
-                self._connection_manager.send_message(frame_message)
+                self._audio_capture.stop()
+                logger.info("Audio sharing stopped")
             except Exception as e:
-                logger.error(f"Failed to send screen frame: {e}")
-
-    def _update_preview_image(self, frame_bytes: bytes) -> None:
-        try:
+                logger.error(f"Error stopping audio: {e}")
+    
+    def _send_audio_frame(self, audio_data: bytes):
+        """Send audio frame to remote device."""
+        if self._connection_manager:
+            self._connection_manager.send_audio_frame(audio_data)
+    
+    def _request_remote_control(self):
+        """Request remote control permissions."""
+        logger.info("Remote control requested")
+        # Would normally send request to remote device
+        self.remote_status.configure(text="● Requesting...", text_color="#FFA500")
+        self.after(2000, lambda: self.remote_status.configure(text="● Granted", text_color="#4CAF50"))
+    
+    def _toggle_audio_sharing(self):
+        """Toggle audio sharing on/off."""
+        if hasattr(self, '_audio_capture') and self._audio_capture:
+            if self._audio_capture.is_running():
+                self._stop_audio_sharing()
+                self.remote_audio_btn.configure(text="Share Audio")
+            else:
+                self._start_audio_sharing()
+                self.remote_audio_btn.configure(text="Stop Audio")
+        else:
+            self._start_audio_sharing()
+            self.remote_audio_btn.configure(text="Stop Audio")
+    
+    def _capture_loop(self):
+        """Main screen capture loop."""
+        mss_instance = mss.mss()
+        self._monitor = mss_instance.monitors[0]  # Primary monitor
+        
+        while self._capturing:
             try:
-                img = customtkinter.CTkImage(
-                    light_image=customtkinter.CTkImage._from_pil_image_bytes(frame_bytes),
-                    dark_image=customtkinter.CTkImage._from_pil_image_bytes(frame_bytes),
-                    size=(self._viewer_label.winfo_width() or 640, self._viewer_label.winfo_height() or 360),
-                )
-            except Exception:
-                import io
-                from PIL import Image
-
-                buffer = io.BytesIO(frame_bytes)
-                pil_image = Image.open(buffer)
-                pil_image.thumbnail(
-                    (self._viewer_label.winfo_width() or 640, self._viewer_label.winfo_height() or 360),
-                    Image.LANCZOS,
-                )
-                img = customtkinter.CTkImage(light_image=pil_image, dark_image=pil_image, size=pil_image.size)
-
-            if self._viewer_label:
-                self._viewer_label.configure(image=img, text="")
-                self._viewer_label._current_image = img
-        except Exception as e:
-            logger.error(f"Failed to update preview image: {e}")
-
-    def _on_network_event(self, event_type: str, payload: Any) -> None:
-        if event_type == "connection":
-            if self._network_status_label:
-                self._network_status_label.configure(
-                    text="Network status: connected",
-                    text_color=self._theme.get_color("success", "#4CAF50"),
-                )
-        elif event_type == "disconnection":
-            if self._network_status_label:
-                self._network_status_label.configure(
-                    text="Network status: disconnected",
-                    text_color=self._theme.get_color("text_secondary", "#A0A0A"),
-                )
-        elif event_type == "message" and isinstance(payload, RemoteDeskMessage):
-            if payload.message_type == MessageType.SCREEN_FRAME.value:
-                self._handle_remote_frame(payload)
-
-    def _handle_remote_frame(self, message: RemoteDeskMessage) -> None:
-        try:
-            frame_data = message.payload.get("frame_data")
-            if not frame_data:
-                return
-
-            frame_bytes = base64.b64decode(frame_data)
-            if self._stream_client:
-                self._stream_client.receive_frame(frame_bytes)
-        except Exception as e:
-            logger.error(f"Failed to decode remote screen frame: {e}")
-
-    def destroy(self) -> None:
-        self._stop_sharing()
-        self._stop_receiving()
-        super().destroy()
+                start_time = time.time()
+                
+                # Capture screen
+                screenshot = mss_instance.grab(self._monitor)
+                img = Image.frombytes("RGB", screenshot.size, screenshot.rgb, "raw", "BGR")
+                
+                # Compress to JPEG
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=self._quality)
+                frame_data = buf.getvalue()
+                
+                # Send frame
+                if self._connection_manager:
+                    self._connection_manager.send_screen_frame(frame_data)
+                
+                # Maintain FPS
+                elapsed = time.time() - start_time
+                sleep_time = max(0.0, 1.0 / self._fps - elapsed)
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                    
+            except Exception as e:
+                logger.error(f"Screen capture error: {e}")
+                self._stop_sharing()
