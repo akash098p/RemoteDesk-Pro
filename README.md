@@ -242,7 +242,7 @@ RemoteDesk-Pro/
 
 ---
 
-## ⏳ Phase 7 — Remote Control
+## 🚧 Phase 7 — Remote Control
 
 - Remote Mouse
 - Remote Keyboard
