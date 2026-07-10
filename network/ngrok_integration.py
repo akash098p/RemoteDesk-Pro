@@ -8,6 +8,9 @@ Enables connections through NAT and firewall restrictions.
 """
 
 from typing import Optional, Callable
+import logging
+
+logger = logging.getLogger(__name__)
 
 class NgrokIntegration:
     """
@@ -133,6 +136,56 @@ class NgrokIntegration:
     def is_active(self) -> bool:
         """Check if a tunnel is currently active."""
         return self._is_active
+
+    def log_info(self, message: str) -> None:
+        """Log info message."""
+        logger.info(message)
+        if self._on_status_change:
+            self._on_status_change("info", {"message": message})
+
+    def log_error(self, message: str) -> None:
+        """Log error message."""
+        logger.error(message)
+        if self._on_status_change:
+            self._on_status_change("error", {"message": message})
+
+    def connect_devices(self, local_port: int, remote_url: str) -> bool:
+        """
+        Establish cross-network connection between devices.
+
+        Args:
+            local_port: Port exposed by local device
+            remote_url: Public URL of remote device (e.g., 'ngrok.io:5000')
+
+        Returns:
+            True if connection established, False otherwise
+        """
+        try:
+            # Start local tunnel if not active
+            if not self.is_active():
+                self.start_tunnel(port=local_port)
+
+            # Connect to remote device
+            if not self.is_active():
+                self.log_error("Local tunnel inactive")
+                return False
+
+            # Validate remote URL format
+            if not remote_url.startswith('http'):
+                remote_url = f'http://{remote_url}'
+
+            # Test connection using simple HTTP request
+            import requests
+            response = requests.get(remote_url, timeout=5)
+            if response.status_code == 200:
+                self.log_info(f"Connected to {remote_url}")
+                return True
+            else:
+                self.log_error(f"Connection failed to {remote_url}: {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_error(f"Network connection error: {str(e)}")
+            return False
     
     def get_local_port(self) -> int:
         """

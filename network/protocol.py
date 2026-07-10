@@ -2,239 +2,107 @@
 ===============================================================================
 RemoteDesk Pro
 File: network/protocol.py
-Defines message protocols for network communication.
-Enforces structured and type-safe message passing.
+Defines the message structure and protocol between clients and servers
 ===============================================================================
 """
 
-import base64
-from typing import Dict, Any, List, Optional
+import time
 from enum import Enum
+from dataclasses import dataclass
+import json
+from typing import Dict, Any
 
 class MessageType(Enum):
-    """Types of messages exchanged in the network."""
-    SYSTEM = "system"
-    CONNECTION = "connection"
-    HANDSHAKE = "handshake"
-    PING = "ping"
-    PONG = "pong"
-    DATA = "data"
-    CONTROL = "control"
-    ERROR = "error"
-    LOG = "log"
-    CHAT_MESSAGE = "chat_message"
-    ATTACHMENT_METADATA = "attachment_metadata"
-    ATTACHMENT_CHUNK = "attachment_chunk"
-    CLIPBOARD_SYNC = "clipboard_sync"
-    SCREEN_FRAME = "screen_frame"
+    """Types of messages exchanged between client and server"""
+    SCREEN_FRAME = 1       # Screen sharing frame message
+    MOUSE_EVENT = 2       # Mouse movement or button click
+    KEYBOARD_EVENT = 3    # Keyboard keystroke
+    CONTROL_REQUEST = 4   # Permission request from remote client
+    HEARTBEAT = 5         # Heartbeat message for connection checking
+    AUDIO_FRAME = 6       # Audio frame for real-time audio streaming
 
-class ProtocolVersion(Enum):
-    """Supported protocol versions."""
-    V1_0 = "1.0"
-    V1_1 = "1.1"
-    V2_0 = "2.0"
-
+@dataclass
 class RemoteDeskMessage:
-    """
-    Standard message structure for all network communications.
-    Ensures consistency across the application.
-    """
+    """Data structure for messages exchanged between components"""
+    type: MessageType
+    payload: Dict[str, Any]
     
-    def __init__(
-        self,
-        message_type: str,
-        payload: Dict[str, Any],
-        message_id: Optional[str] = None,
-        version: str = ProtocolVersion.V2_0.value,
-        sender_id: Optional[str] = None,
-        recipient_id: Optional[str] = None,
-        timestamp: Optional[float] = None,
-        sequence_number: Optional[int] = None,
-        compression: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        self.message_type = message_type
-        self.payload = payload
-        self.message_id = message_id
-        self.version = version
-        self.sender_id = sender_id
-        self.recipient_id = recipient_id
-        self.timestamp = timestamp or time.time()
-        self.sequence_number = sequence_number
-        self.compression = compression
-        self.metadata = metadata or {}
-
     def to_dict(self) -> Dict[str, Any]:
-        """Convert message to dictionary representation."""
+        """Convert message to dictionary for serialization"""
         return {
-            "type": self.message_type,
-            "payload": self.payload,
-            "id": self.message_id,
-            "version": self.version,
-            "sender": self.sender_id,
-            "recipient": self.recipient_id,
-            "timestamp": self.timestamp,
-            "sequence": self.sequence_number,
-            "compression": self.compression,
-            "metadata": self.metadata,
+            "type": self.type.value,
+            "payload": self.payload
         }
-
+    
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "RemoteDeskMessage":
-        """Create a message from dictionary representation."""
-        return cls(
-            message_type=data["type"],
-            payload=data["payload"],
-            message_id=data.get("id"),
-            version=data.get("version", ProtocolVersion.V2_0.value),
-            sender_id=data.get("sender"),
-            recipient_id=data.get("recipient"),
-            timestamp=data.get("timestamp"),
-            sequence_number=data.get("sequence"),
-            compression=data.get("compression"),
-            metadata=data.get("metadata"),
-        )
-
-    def is_valid(self) -> bool:
-        """
-        Validate the message.
-        
-        Returns:
-            True if message is valid, False otherwise
-        """
-        if not self.message_type:
-            return False
-        
-        if not isinstance(self.message_type, str) or not MessageType(self.message_type):
-            return False
-        
-        if not isinstance(self.payload, dict):
-            return False
-        
-        return True
-
-    def __str__(self) -> str:
-        return f"RemoteDeskMessage(type={self.message_type}, sender={self.sender_id}, recipient={self.recipient_id})"
+    def from_dict(cls, data: Dict[str, Any]) -> 'RemoteDeskMessage':
+        """Create RemoteDeskMessage from dictionary"""
+        msg_type = MessageType(data["type"])
+        payload = data["payload"]
+        return cls(type=msg_type, payload=payload)
+    
+    def to_json(self) -> str:
+        """Serialize message to JSON string"""
+        return json.dumps(self.to_dict())
+    
+    @classmethod
+    def from_json(cls, json_str: str) -> 'RemoteDeskMessage':
+        """Deserialize JSON string to RemoteDeskMessage"""
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+    
+    def __repr__(self) -> str:
+        """String representation for debugging"""
+        return f"RemoteDeskMessage(type={self.type}, payload={self.payload})"
 
 class MessageFactory:
-    """
-    Factory class for creating different types of messages.
-    Provides helper methods for common message types.
-    """
+    """Factory class for creating RemoteDeskMessage instances"""
     
     @staticmethod
-    def create_handshake(username: str, client_id: str) -> "RemoteDeskMessage":
-        """Create a handshake message."""
-        return RemoteDeskMessage(
-            message_type=MessageType.HANDSHAKE.value,
-            payload={
-                "username": username,
-                "client_id": client_id,
-                "platform": "windows",
-                "version": ProtocolVersion.V2_0.value,
-            },
-        )
-
-    @staticmethod
-    def create_ping() -> "RemoteDeskMessage":
-        """Create a ping message."""
-        return RemoteDeskMessage(
-            message_type=MessageType.PING.value,
-            payload={},
-        )
-
-    @staticmethod
-    def create_pong(ping_id: str) -> "RemoteDeskMessage":
-        """Create a pong message."""
-        return RemoteDeskMessage(
-            message_type=MessageType.PONG.value,
-            payload={
-                "ping_id": ping_id,
-                "response_time": time.time(),
-            },
-        )
-
-    @staticmethod
-    def create_data(message: str, file_path: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> "RemoteDeskMessage":
-        """Create a data message."""
-        payload = {"message": message}
-        if file_path:
-            payload["file_path"] = file_path
-        if metadata:
-            payload["metadata"] = metadata
-            
-        return RemoteDeskMessage(
-            message_type=MessageType.DATA.value,
-            payload=payload,
-        )
-
-    @staticmethod
-    def create_screen_frame(frame_bytes: bytes, metadata: Optional[Dict[str, Any]] = None) -> "RemoteDeskMessage":
-        """Create a screen frame message with base64-encoded payload."""
-        encoded_frame = base64.b64encode(frame_bytes).decode("ascii")
+    def create_screen_frame(frame_data: bytes, timestamp: float = None) -> RemoteDeskMessage:
+        """Create a screen frame message"""
         payload = {
-            "frame_data": encoded_frame,
-            "format": "jpeg",
-            "timestamp": time.time(),
+            "frame_data": frame_data,
+            "timestamp": timestamp or time.time(),
+            "width": 1920,  # Default width
+            "height": 1080  # Default height
         }
-        if metadata:
-            payload["metadata"] = metadata
-
-        return RemoteDeskMessage(
-            message_type=MessageType.SCREEN_FRAME.value,
-            payload=payload,
-        )
-
+        return RemoteDeskMessage(type=MessageType.SCREEN_FRAME, payload=payload)
+    
     @staticmethod
-    def create_system_info(cpu_usage: float, ram_usage: float, free_memory: float) -> "RemoteDeskMessage":
-        """Create a system information message."""
-        return RemoteDeskMessage(
-            message_type=MessageType.SYSTEM.value,
-            payload={
-                "cpu_usage": cpu_usage,
-                "ram_usage": ram_usage,
-                "free_memory": free_memory,
-            },
-        )
-
-    @staticmethod
-    def create_error(error_type: str, error_message: str, details: Optional[Dict[str, Any]] = None) -> "RemoteDeskMessage":
-        """Create an error message."""
+    def create_mouse_event(x: int, y: int, button: str = "left", action: str = "move") -> RemoteDeskMessage:
+        """Create a mouse event message"""
         payload = {
-            "error_type": error_type,
-            "error_message": error_message,
+            "x": x,
+            "y": y,
+            "button": button,
+            "action": action
         }
-        if details:
-            payload["details"] = details
-            
-        return RemoteDeskMessage(
-            message_type=MessageType.ERROR.value,
-            payload=payload,
-        )
-
+        return RemoteDeskMessage(type=MessageType.MOUSE_EVENT, payload=payload)
+    
     @staticmethod
-    def create_log(level: str, message: str, source: Optional[str] = None) -> "RemoteDeskMessage":
-        """Create a log message."""
+    def create_keyboard_event(key: str, action: str = "press") -> RemoteDeskMessage:
+        """Create a keyboard event message"""
         payload = {
-            "level": level,
-            "message": message,
-            "source": source or "system",
-            "timestamp": time.time(),
+            "key": key,
+            "action": action
         }
-        return RemoteDeskMessage(
-            message_type=MessageType.LOG.value,
-            payload=payload,
-        )
-
+        return RemoteDeskMessage(type=MessageType.KEYBOARD_EVENT, payload=payload)
+    
     @staticmethod
-    def create_ping_pong_pair() -> Tuple["RemoteDeskMessage", "RemoteDeskMessage"]:
-        """Create a ping-pong pair for round-trip time measurement."""
-        import uuid
-        ping_id = str(uuid.uuid4())
-        ping = MessageFactory.create_ping()
-        pong = MessageFactory.create_pong(ping_id)
-        return ping, pong
-
-
-import time
-from typing import Tuple
+    def create_audio_frame(audio_data: bytes, timestamp: float = None) -> RemoteDeskMessage:
+        """Create an audio frame message for real-time audio streaming"""
+        payload = {
+            "audio_data": audio_data,
+            "timestamp": timestamp or time.time()
+        }
+        return RemoteDeskMessage(type=MessageType.AUDIO_FRAME, payload=payload)
+    
+    @staticmethod
+    def create_control_request(request_type: str, data: Dict[str, Any]) -> RemoteDeskMessage:
+        """Create a control request message"""
+        payload = {
+            "type": request_type,
+            "data": data
+        }
+        return RemoteDeskMessage(type=MessageType.CONTROL_REQUEST, payload=payload)
