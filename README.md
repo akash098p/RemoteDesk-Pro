@@ -232,7 +232,7 @@ RemoteDesk-Pro/
 
 ---
 
-## 🚧 Phase 6 — File Transfer
+## ✅ Phase 6 — File Transfer
 
 - File Transfer
 - Folder Transfer
