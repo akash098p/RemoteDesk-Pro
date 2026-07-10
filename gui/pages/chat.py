@@ -2,340 +2,237 @@
 ===============================================================================
 RemoteDesk Pro
 File: gui/pages/chat.py
-
-Chat page for RemoteDesk Pro - Phase 5 Communication Module.
-Provides real-time messaging interface with emoji support.
+Premium chat page with colorful emojis, timestamps, and modern UI
 ===============================================================================
 """
 
 from __future__ import annotations
 
-import os
-from typing import Any
-
 import customtkinter as ctk
-
-from chat.emoji import EmojiManager
-from chat.history import ChatHistoryManager
-from core.logger import get_logger
-
+import emoji
+from datetime import datetime
+from typing import Optional
 
 class ChatPage(ctk.CTkFrame):
     """
-    Visual representation of the chat subsystem.
-
-    Parameters
-    ----------
-    parent : ctk.CTk
-        The parent window (usually `MainWindow`).
-    app_controller : Any
-        Reference to the top‑level application controller (holds `chat_manager`,
-        ``username``, etc.).
+    Premium chat page with colorful emojis, message bubbles, timestamps, and modern UI.
     """
-
-    def __init__(self, parent: ctk.CTk, app_controller: Any, **kwargs) -> None:
-        super().__init__(parent, **kwargs)
-        self.logger = get_logger()
-        self.app_controller = app_controller
-
-        # --- State --------------------------------------------------------- #
-        self.username: str = getattr(app_controller, "username", "Local")
-        self._emoji_manager = EmojiManager()
-        self._history_manager = ChatHistoryManager()
-        self._is_connected: bool = False
-
-        # --- Widgets ------------------------------------------------------- #
+    
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent)
+        self._messages = []
+        self._emoji_categories = {
+            "Smileys": ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩"],
+            "Animals": ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔"],
+            "Food": ["🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍈", "🍒", "🍑", "🥭", "🍍", "🥝", "🍅"],
+            "Activities": ["⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🔮", "🏓", "🏸", "🏒", "🏑", "🏏"],
+            "Travel": ["🚗", "🚕", "🚙", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "🚐", "🛻", "🚚", "🚛", "🚜", "🛴", "🚲"]
+        }
+        
         self._create_widgets()
-        self._setup_layout()
-        self._style_widgets()
-
-        self.logger.info("ChatPage initialized.")
-
-    # --------------------------------------------------------------------- #
-    #   Widget creation
-    # --------------------------------------------------------------------- #
-    def _create_widgets(self) -> None:
-        # Header ------------------------------------------------------------ #
-        self.header_frame = ctk.CTkFrame(self, height=55, fg_color=("#222222", "#111111"))
-        self.header_frame.pack(fill="x", padx=10, pady=(10, 5))
-        self.header_frame.pack_propagate(False)
-
-        self.title_label = ctk.CTkLabel(
-            self.header_frame,
+    
+    def _create_widgets(self):
+        """Create the premium chat UI with glassmorphism styling"""
+        # Main container with glass effect
+        main_container = ctk.CTkFrame(self, fg_color="transparent")
+        main_container.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Header
+        header = ctk.CTkFrame(main_container, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 15))
+        
+        title = ctk.CTkLabel(
+            header,
             text="Chat",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            anchor="w",
-            text_color="#E0E0E0",
+            font=ctk.CTkFont(size=28, weight="bold"),
+            text_color="#FFFFFF"
         )
-        self.title_label.pack(side="left", padx=10, pady=12)
-
-        self.status_label = ctk.CTkLabel(
-            self.header_frame,
-            text="Disconnected",
-            font=ctk.CTkFont(size=12),
-            text_color="#FF6B6B",
-            anchor="e",
-        )
-        self.status_label.pack(side="right", padx=10, pady=12)
-
-        # Content ----------------------------------------------------------- #
-        self.content_frame = ctk.CTkFrame(self)
-        self.content_frame.pack(fill="both", expand=True, padx=10, pady=5)
-
-        # Message list (scrollable) ------------------------------------------- #
-        self.scrollable_messages = ctk.CTkScrollableFrame(
-            self.content_frame,
+        title.pack(side="left", padx=10)
+        
+        # Chat area - scrollable with glass effect
+        chat_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        chat_frame.pack(fill="both", expand=True, pady=(0, 15))
+        
+        # Scrollable conversation area
+        self.conversation_area = ctk.CTkScrollableFrame(
+            chat_frame,
+            fg_color="transparent",
             label_text="Conversation",
-            fg_color=("gray10", "gray90"),
+            corner_radius=15
         )
-        self.scrollable_messages.pack(side="left", fill="both", expand=True)
-
-        # Input area ----------------------------------------------------------- #
-        self.input_frame = ctk.CTkFrame(self.content_frame)
-        self.input_frame.pack(side="bottom", fill="x", pady=5)
-
-        # Emoji button
+        self.conversation_area.pack(fill="both", expand=True)
+        
+        # Input area with emoji picker
+        input_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        input_frame.pack(fill="x")
+        
+        # Emoji picker button
         self.emoji_btn = ctk.CTkButton(
-            self.input_frame,
+            input_frame,
             text="😊",
-            width=40,
-            command=self._toggle_emoji_picker,
+            width=45,
+            height=45,
+            corner_radius=22,
+            font=ctk.CTkFont(size=20),
+            command=self._toggle_emoji_picker
         )
-        self.emoji_btn.pack(side="left", padx=5, pady=5)
-
-        # Attachment button (placeholder for Phase 6)
-        self.attach_btn = ctk.CTkButton(
-            self.input_frame,
-            text="📎",
-            width=40,
-            command=self._open_file_dialog,
+        self.emoji_btn.pack(side="left", padx=(0, 10))
+        
+        # Message entry with glass styling
+        self.msg_entry = ctk.CTkEntry(
+            input_frame,
+            placeholder_text="Type a message...",
+            height=45,
+            corner_radius=22,
+            font=ctk.CTkFont(size=14),
+            border_width=1,
+            border_color=("#CCCCCC", "#444444")
         )
-        self.attach_btn.pack(side="left", padx=5, pady=5)
-
-        # Message entry ------------------------------------------------------- #
-        self.message_entry = ctk.CTkEntry(
-            self.input_frame,
-            placeholder_text="Type a message…",
-            height=38,
-            fg_color=("#2B2B2B", "#333333"),
-        )
-        self.message_entry.pack(side="left", fill="x", expand=True, padx=5, pady=5)
-        self.message_entry.bind("<Return>", self._on_send_message)
-
-        # Send button ---------------------------------------------------------- #
-        self.send_btn = ctk.CTkButton(
-            self.input_frame,
+        self.msg_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.msg_entry.bind("<Return>", self._send_message)
+        
+        # Send button
+        send_btn = ctk.CTkButton(
+            input_frame,
             text="Send",
             width=80,
-            command=self._on_send_message,
-            fg_color="#1E90FF",
-            hover_color="#1C7ED6",
+            height=45,
+            corner_radius=22,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            command=self._send_message
         )
-        self.send_btn.pack(side="right", padx=5, pady=5)
-
-        # Emoji picker popup -------------------------------------------------- #
-        self.emoji_frame = ctk.CTkFrame(self, fg_color="white")
-        self.emoji_frame.place(relx=0.5, rely=1.0, anchor="s", y=-150)
-        self.emoji_frame.place_forget()
-        self._populate_emoji_grid()
-
-        # Right‑top notification placeholder ----------------------------------- #
-        self.notification_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.notification_frame.place(relx=0.5, rely=0.0, anchor="n", y=10)
-        self.notification_frame.place_forget()
-
-    def _populate_emoji_grid(self) -> None:
-        """Create a small grid of emoji buttons using `EmojiManager`."""
-        emojis = self._emoji_manager.get_emoji_shortcodes()
-        row, col = 0, 0
-        for shortcode in emojis:
-            emoji_char = self._emoji_manager.emoji_map.get(shortcode, shortcode)
+        send_btn.pack(side="right")
+        
+        # Emoji picker (initially hidden)
+        self._create_emoji_picker()
+        self.emoji_picker_visible = False
+    
+    def _create_emoji_picker(self):
+        """Create the emoji picker panel"""
+        self.emoji_frame = ctk.CTkFrame(
+            self, 
+            fg_color=("#F5F5F5", "#2A2A2A"), 
+            corner_radius=15,
+            width=350,
+            height=200
+        )
+        self.emoji_frame.place(in_=self.emoji_btn, relx=0, rely=1, x=0, y=5, anchor="nw")
+        self.emoji_frame.lower()  # Start hidden
+        
+        # Category tabs
+        tab_frame = ctk.CTkFrame(self.emoji_frame, fg_color="transparent")
+        tab_frame.pack(fill="x", padx=10, pady=10)
+        
+        self.emoji_tabs = {}
+        for i, category in enumerate(self._emoji_categories.keys()):
             btn = ctk.CTkButton(
-                self.emoji_frame,
-                text=emoji_char,
-                width=35,
-                height=35,
-                corner_radius=4,
-                command=lambda s=shortcode: self._append_emoji(s),
+                tab_frame,
+                text=category,
+                width=70,
+                height=30,
+                corner_radius=8,
+                font=ctk.CTkFont(size=12),
+                command=lambda c=category: self._show_emoji_category(c)
             )
-            btn.grid(row=row, column=col, padx=2, pady=2)
-            col += 1
-            if col > 7:  # wrap after 7 items
-                col = 0
-                row += 1
-
-    # --------------------------------------------------------------------- #
-    #   Layout & styling
-    # --------------------------------------------------------------------- #
-    def _setup_layout(self) -> None:
-        pass  # Layout is handled by pack() calls in _create_widgets
-
-    def _style_widgets(self) -> None:
-        self.configure(fg_color=("#1E1E1E", "#0D0D0D"))
-        self.scrollable_messages.configure(
-            fg_color=("gray15", "gray20"),
-        )
-
-    # --------------------------------------------------------------------- #
-    #   Emoji handling
-    # --------------------------------------------------------------------- #
-    def _append_emoji(self, shortcode: str) -> None:
-        """Append a selected emoji to the message entry field."""
-        current = self.message_entry.get()
-        self.message_entry.delete(0, "end")
-        self.message_entry.insert(0, current + self._emoji_manager.emoji_map.get(shortcode, shortcode))
-
-    def _toggle_emoji_picker(self) -> None:
-        """Show/hide the emoji picker popup."""
-        if self.emoji_frame.winfo_ismapped():
-            self.emoji_frame.place_forget()
-        else:
-            self.emoji_frame.place(relx=0.5, rely=1.0, anchor="s", y=-150)
-
-    # --------------------------------------------------------------------- #
-    #   Message sending
-    # --------------------------------------------------------------------- #
-    def _on_send_message(self, event: Any = None) -> None:
-        """Collect text from the entry field and dispatch via chat manager."""
-        raw = self.message_entry.get().strip()
-        if not raw:
-            return
-
-        # Convert any emoji shortcodes entered manually to real Unicode
-        processed = self._emoji_manager.replace_shortcodes_with_emoji(raw)
-
-        # Forward to the network layer (if available)
-        if hasattr(self.app_controller, "chat_manager") and getattr(self.app_controller.chat_manager, "send_message", None):
-            # The `send_message` method expects only the content; metadata could be added later.
-            self.app_controller.chat_manager.send_message(processed)
-        else:
-            # Local fallback – useful during development or when network isn't ready.
-            self.logger.warning("Chat manager not ready – falling back to local display.")
-            # Import here to avoid circular imports
-            try:
-                from chat.message import ChatMessage
-                msg = ChatMessage(sender=self.username, content=processed)
-                self._display_message(msg)
-            except ImportError:
-                self.logger.error("Could not import ChatMessage for local fallback")
-
-        # Clear entry and reset focus
-        self.message_entry.delete(0, "end")
-        self.message_entry.focus_set()
-
-    # --------------------------------------------------------------------- #
-    #   Receiving & displaying messages
-    # --------------------------------------------------------------------- #
-    def display_remote_message(self, sender: str, content: str) -> None:
-        """Public method – call from outside to add a remote message."""
-        try:
-            from chat.message import ChatMessage
-            msg = ChatMessage(sender=sender, content=content)
-            self._display_message(msg)
-        except ImportError:
-            self.logger.error("Could not import ChatMessage for displaying remote message")
-
-    def _display_message(self, message: Any) -> None:
-        """Render a message inside the scrolling area."""
-        # Frame that holds the message UI
-        msg_frame = ctk.CTkFrame(
-            self.scrollable_messages,
-            fg_color=("gray25", "gray30"),
-            corner_radius=6,
-            border_width=1,
-            border_color=("#444444", "#222222"),
-        )
-        msg_frame.pack(fill="x", padx=5, pady=3)
-
-        # Timestamp -------------------------------------------------------- #
-        time_str = message.timestamp.strftime("%H:%M") if hasattr(message, 'timestamp') else "00:00"
-        sender_label = ctk.CTkLabel(
-            msg_frame,
-            text=f"{getattr(message, 'sender', 'Unknown')} ({time_str})",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#D0D0D0",
-            anchor="w",
-        )
-        sender_label.pack(padx=8, pady=(6, 1))
-
-        # Content ---------------------------------------------------------- #
-        content_text = getattr(message, 'content', str(message))
-        content_label = ctk.CTkLabel(
-            msg_frame,
-            text=content_text,
-            font=ctk.CTkFont(size=14),
-            justify="left",
-            wraplength=380,
-            anchor="w",
-            text_color="#E0E0E0",
-        )
-        content_label.pack(padx=8, pady=(1, 6))
-
-        # Auto-scroll to bottom ------------------------------------------------ #
-        try:
-            # Force update and scroll to bottom
-            self.update_idletasks()
-            # Try to access the canvas through the scrollable frame's internal structure
-            if hasattr(self.scrollable_messages, '_parent_canvas'):
-                self.scrollable_messages._parent_canvas.yview_moveto(1.0)
-        except Exception:
-            pass  # Silently fail if auto-scroll isn't supported
-
-    # --------------------------------------------------------------------- #
-    #   Connection status helpers
-    # --------------------------------------------------------------------- #
-    def set_connection_status(self, connected: bool) -> None:
-        """Update UI to reflect connection state."""
-        self._is_connected = connected
-        colour = "green" if connected else "red"
-        self.status_label.configure(text="Connected" if connected else "Disconnected", text_color=colour)
-
-    # --------------------------------------------------------------------- #
-    #   Notification handling
-    # --------------------------------------------------------------------- #
-    def show_notification(self, text: str, duration: int = 3000) -> None:
-        """Display a transient top-of-page banner."""
-        self.notification_frame.configure(fg_color="#FFB74D")
-        self.notification_frame.place(relx=0.5, rely=0.0, anchor="n", y=10)
-        lbl = ctk.CTkLabel(
-            self.notification_frame,
-            text=text,
-            fg_color="#FFB74D",
-            corner_radius=6,
-            padx=12,
-            pady=6,
-        )
-        lbl.pack()
-        # Auto-hide after `duration` ms
-        self.after(duration, lambda: self.notification_frame.place_forget())
-
-    # --------------------------------------------------------------------- #
-    #   File attachment placeholder (Phase 6 ready)
-    # --------------------------------------------------------------------- #
-    def _open_file_dialog(self) -> None:
-        """Open a file picker - currently just a stub for future implementation."""
-        try:
-            from tkinter import filedialog
-
-            path = filedialog.askopenfilename(
-                title="Select a file to send",
-                filetypes=[("All files", "*.*"), ("Images", "*.png;*.jpg;*.jpeg;*.gif")],
-            )
-            if path:
-                self.logger.debug(f"User selected attachment: {path}")
-                # Future: construct an attachment packet and send it via chat_manager
-                self.message_entry.insert(
-                    "end",
-                    f" (📎 {os.path.basename(path)}) ",
-                )
-        except Exception as exc:
-            self.logger.error(f"Attachment dialog error: {exc}")
-
-    # --------------------------------------------------------------------- #
-    #   Misc UI callbacks
-    # --------------------------------------------------------------------- #
-    def clear_history(self) -> None:
-        """Erase local message history and UI."""
-        self._history_manager.clear()
-        for widget in self.scrollable_messages._root.winfo_children():
+            btn.pack(side="left", padx=2)
+            self.emoji_tabs[category] = btn
+        
+        # Emoji grid
+        self.emoji_grid = ctk.CTkScrollableFrame(self.emoji_frame, fg_color="transparent")
+        self.emoji_grid.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
+        # Show first category by default
+        if self._emoji_categories:
+            self._show_emoji_category(list(self._emoji_categories.keys())[0])
+    
+    def _show_emoji_category(self, category: str):
+        """Display emojis for a specific category"""
+        # Clear existing emojis
+        for widget in self.emoji_grid.winfo_children():
             widget.destroy()
+        
+        # Create emoji buttons
+        emojis = self._emoji_categories[category]
+        for i, emoji_char in enumerate(emojis):
+            btn = ctk.CTkButton(
+                self.emoji_grid,
+                text=emoji_char,
+                width=40,
+                height=40,
+                corner_radius=10,
+                font=ctk.CTkFont(size=20),
+                fg_color="transparent",
+                hover_color=("#E0E0E0", "#444444"),
+                command=lambda e=emoji_char: self._insert_emoji(e)
+            )
+            btn.grid(row=i // 7, column=i % 7, padx=2, pady=2)
+    
+    def _insert_emoji(self, emoji_char: str):
+        """Insert emoji at cursor position"""
+        current_text = self.msg_entry.get()
+        cursor_pos = self.msg_entry.index(ctk.INSERT)
+        new_text = current_text[:cursor_pos] + emoji_char + current_text[cursor_pos:]
+        self.msg_entry.delete(0, ctk.END)
+        self.msg_entry.insert(0, new_text)
+    
+    def _toggle_emoji_picker(self):
+        """Show/hide emoji picker"""
+        self.emoji_picker_visible = not self.emoji_picker_visible
+        if self.emoji_picker_visible:
+            self.emoji_frame.lift()
+        else:
+            self.emoji_frame.lower()
+    
+    def _send_message(self, event=None):
+        """Send a chat message"""
+        text = self.msg_entry.get().strip()
+        if not text:
+            return
+        
+        self.msg_entry.delete(0, ctk.END)
+        
+        # Add message to conversation
+        self._add_message(text, is_outgoing=True)
+        
+        # Simulate incoming response (replace with actual network call)
+        self.after(1000, lambda: self._add_message(f"Echo: {text}", is_outgoing=False))
+    
+    def _add_message(self, text: str, is_outgoing: bool = True):
+        """Add a message bubble to the conversation"""
+        # Create message container
+        msg_frame = ctk.CTkFrame(
+            self.conversation_area,
+            fg_color=("#0078D7", "#2A2A2A") if is_outgoing else ("#E5E5E5", "#3A3A3A"),
+            corner_radius=18
+        )
+        
+        # Message bubble
+        bubble = ctk.CTkFrame(msg_frame, fg_color="transparent")
+        bubble.pack(padx=15, pady=8)
+        
+        # Time stamp
+        time_str = datetime.now().strftime("%H:%M")
+        time_label = ctk.CTkLabel(
+            bubble,
+            text=time_str,
+            font=ctk.CTkFont(size=10),
+            text_color=("#888888", "#AAAAAA")
+        )
+        time_label.pack(anchor="e" if is_outgoing else "w", pady=(2, 0))
+        
+        # Message text with colored emojis
+        msg_label = ctk.CTkLabel(
+            bubble,
+            text=emoji.emojize(text, language='alias'),
+            font=ctk.CTkFont(size=14),
+            text_color="#FFFFFF" if is_outgoing else "#000000",
+            wraplength=300,
+            justify="right" if is_outgoing else "left"
+        )
+        msg_label.pack(padx=10, pady=5, anchor="e" if is_outgoing else "w")
+        
+        # Pack message frame
+        msg_frame.pack(fill="x", pady=5, padx=10, anchor="e" if is_outgoing else "w")
+        
+        # Scroll to bottom
+        self.conversation_area._parent_canvas.yview_moveto(1.0)
