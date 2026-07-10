@@ -1,168 +1,226 @@
 """
-===============================================================================
+=================================================================================
 RemoteDesk Pro
 File: gui/pages/dashboard.py
-
-Dashboard page showing overview information, system status, and quick actions.
-===============================================================================
+Modern dashboard with system stats, quick actions and premium glass UI
+=================================================================================
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Callable
+import os
 
-import customtkinter
+import customtkinter as ctk
+from PIL import Image
+import time
 
-from core.constants import FONT_SIZE_HEADER, FONT_SIZE_BODY
-from core.theme_manager import get_theme_manager
+from core.constants import DEFAULT_FPS, DEFAULT_QUALITY
+from core.logger import get_logger
 from core.utils import get_cpu_usage, get_ram_usage
 
-if TYPE_CHECKING:
-    from gui.main_window import MainWindow
+logger = get_logger()
+
+# Get the assets directory path
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'icons')
 
 
-class DashboardPage(customtkinter.CTkFrame):
+def load_icon(icon_name: str, size: tuple = (24, 24)) -> Image.Image:
+    """Load an icon from the assets directory."""
+    icon_path = os.path.join(ASSETS_DIR, icon_name)
+    if os.path.exists(icon_path):
+        return Image.open(icon_path).resize(size, Image.Resampling.LANCZOS)
+    return None  # Return None if icon not found
+
+
+class DashboardPage(ctk.CTkFrame):
     """
-    Main dashboard page for RemoteDesk Pro.
-    Displays system information, quick actions, and application status.
+    Premium dashboard page – system stats, quick actions and status overview.
     """
 
-    def __init__(self, parent: "MainWindow") -> None:
-        super().__init__(parent, fg_color="transparent")
-        self.parent = parent
-        self._theme_manager = get_theme_manager()
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent)
+        self._last_update = time.time()
+        self._cpu_usage = 0
+        self._ram_usage = 0
+        # Get theme manager from parent
+        self._theme_manager = parent._theme_manager if hasattr(parent, '_theme_manager') else None
+        self._initialize_ui()
+        # Start system status updates
+        self.after(0, self._update_system_status)
 
-        # Create UI
-        self._create_widgets()
-        self._start_updates()
+    def _initialize_ui(self):
+        """Create the premium dashboard layout"""
+        # Main background with glass effect
+        self._set_appearance_mode("dark")
+        self._set_appearance_mode("system")
 
-    def _create_widgets(self) -> None:
-        """Create the dashboard layout."""
-        # Main container with padding
-        container = customtkinter.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=20, pady=20)
+        # Title section
+        title_frame = ctk.CTkFrame(self, fg_color="transparent")
+        title_frame.pack(fill="x", pady=(20, 10))
 
-        # Title
-        title_label = customtkinter.CTkLabel(
-            container,
-            text="Dashboard",
-            font=customtkinter.CTkFont(family="Inter", size=FONT_SIZE_HEADER, weight="bold"),
-            text_color=self._theme_manager.get_color("text_primary", "#FFFFFF"),
-            anchor="w",
+        title_label = ctk.CTkLabel(
+            title_frame,
+            text="RemoteDesk Pro",
+            font=ctk.CTkFont(size=32, weight="bold"),
+            text_color=("#FFFFFF", "#FFFFFF")
         )
-        title_label.pack(fill="x", pady=(0, 20))
+        title_label.pack(padx=20, pady=(10, 5))
 
-        # System status cards row
-        status_row = customtkinter.CTkFrame(container, fg_color="transparent")
-        status_row.pack(fill="x", pady=(0, 20))
+        # Stats container (using pack instead of grid)
+        stats_container = ctk.CTkFrame(self, fg_color="transparent")
+        stats_container.pack(fill="x", padx=20, pady=10)
 
         # CPU Card
-        self.cpu_card = customtkinter.CTkFrame(
-            status_row,
-            fg_color=self._theme_manager.get_color("card_bg", "#252525"),
-            corner_radius=10,
-        )
-        self.cpu_card.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        cpu_frame = ctk.CTkFrame(stats_container, fg_color="transparent")
+        cpu_frame.pack(side="left", fill="x", expand=True, padx=20, pady=10)
 
-        cpu_title = customtkinter.CTkLabel(
-            self.cpu_card,
+        ctk.CTkLabel(
+            cpu_frame,
             text="CPU Usage",
-            font=customtkinter.CTkFont(family="Inter", size=FONT_SIZE_BODY),
-            text_color=self._theme_manager.get_color("text_secondary", "#A0A0A0"),
-        )
-        cpu_title.pack(pady=(15, 5))
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#CCCCCC"
+        ).pack(pady=(10, 5))
 
-        self.cpu_value = customtkinter.CTkLabel(
-            self.cpu_card,
+        self.cpu_value = ctk.CTkLabel(
+            cpu_frame,
             text="0%",
-            font=customtkinter.CTkFont(family="Inter", size=36, weight="bold"),
-            text_color=self._theme_manager.get_color("primary", "#0084FF"),
+            font=ctk.CTkFont(size=36, weight="bold"),
+            text_color="#00C0FF"
         )
-        self.cpu_value.pack(pady=(5, 15))
+        self.cpu_value.pack()
 
         # RAM Card
-        self.ram_card = customtkinter.CTkFrame(
-            status_row,
-            fg_color=self._theme_manager.get_color("card_bg", "#252525"),
-            corner_radius=10,
-        )
-        self.ram_card.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        ram_frame = ctk.CTkFrame(stats_container, fg_color="transparent")
+        ram_frame.pack(side="left", fill="x", expand=True, padx=20, pady=10)
 
-        ram_title = customtkinter.CTkLabel(
-            self.ram_card,
+        ctk.CTkLabel(
+            ram_frame,
             text="RAM Usage",
-            font=customtkinter.CTkFont(family="Inter", size=FONT_SIZE_BODY),
-            text_color=self._theme_manager.get_color("text_secondary", "#A0A0A0"),
-        )
-        ram_title.pack(pady=(15, 5))
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=("#A0A0A0", "#FFFFFF")
+        ).pack(pady=(10, 5))
 
-        self.ram_value = customtkinter.CTkLabel(
-            self.ram_card,
+        self.ram_value = ctk.CTkLabel(
+            ram_frame,
             text="0%",
-            font=customtkinter.CTkFont(family="Inter", size=36, weight="bold"),
-            text_color=self._theme_manager.get_color("primary", "#0084FF"),
+            font=ctk.CTkFont(size=36, weight="bold"),
+            text_color="#4CAF50"
         )
-        self.ram_value.pack(pady=(5, 15))
+        self.ram_value.pack()
 
         # Quick Actions Section
-        actions_label = customtkinter.CTkLabel(
-            container,
+        actions_frame = ctk.CTkFrame(self, fg_color="transparent")
+        actions_frame.pack(fill="x", pady=(20, 10))
+
+        ctk.CTkLabel(
+            actions_frame,
             text="Quick Actions",
-            font=customtkinter.CTkFont(family="Inter", size=FONT_SIZE_HEADER, weight="bold"),
-            text_color=self._theme_manager.get_color("text_primary", "#FFFFFF"),
-            anchor="w",
-        )
-        actions_label.pack(fill="x", pady=(20, 15))
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color="#A0A0A0"
+        ).pack(anchor="w", pady=(10, 5))
 
-        # Action buttons
-        actions_frame = customtkinter.CTkFrame(container, fg_color="transparent")
-        actions_frame.pack(fill="x", pady=(0, 20))
+        # Quick action buttons with glass effect and icons
+        actions = [
+            ("monitor.png", "Start Sharing", self._start_sharing),
+            ("plug-zap.png", "Remote Control", self._start_remote_control),
+            ("folder.png", "File Transfer", self._open_files),
+            ("settings.png", "Settings", self._open_settings),
+            ("info.png", "About", self._show_about)
+        ]
 
-        connect_btn = customtkinter.CTkButton(
-            actions_frame,
-            text="New Connection",
-            font=customtkinter.CTkFont(family="Inter", size=FONT_SIZE_BODY),
-            width=150,
-            height=40,
-            command=self._on_connect,
-        )
-        connect_btn.pack(side="left", padx=(0, 10))
+        # Container for buttons (inside actions_frame)
+        buttons_frame = ctk.CTkFrame(actions_frame, fg_color="transparent")
+        buttons_frame.pack(fill="x", padx=20, pady=5)
 
-        settings_btn = customtkinter.CTkButton(
-            actions_frame,
-            text="Settings",
-            font=customtkinter.CTkFont(family="Inter", size=FONT_SIZE_BODY),
-            width=150,
-            height=40,
-            command=self._on_settings,
-        )
-        settings_btn.pack(side="left", padx=(10, 0))
+        for icon_file, text, command in actions:
+            # Load and create the icon image
+            icon_image = load_icon(icon_file, size=(20, 20))
+            if icon_image:
+                ctk_icon = ctk.CTkImage(light_image=icon_image, dark_image=icon_image, size=(20, 20))
+                btn = ctk.CTkButton(
+                    buttons_frame,
+                    image=ctk_icon,
+                    text=text,
+                    compound="left",
+                    width=150,
+                    height=45,
+                    corner_radius=12,
+                    fg_color=("#4A90E2", "#2E3A47"),
+                )
+            else:
+                # Fallback to text-only button if icon not found
+                btn = ctk.CTkButton(
+                    buttons_frame,
+                    text=text,
+                    width=150,
+                    height=45,
+                    corner_radius=12,
+                    fg_color=("#4A90E2", "#2E3A47"),
+                )
+            btn.pack(side="left", padx=10, pady=5)
+            # Store command reference
+            if not hasattr(self, f"_btn_{text.strip()}"):
+                setattr(self, f"_btn_{text.strip()}", [])
 
-    def _start_updates(self) -> None:
-        """Start periodic system status updates."""
-        self._update_system_status()
+    def _start_sharing(self):
+        """Start screen sharing session"""
+        # Would normally call connection manager to start sharing
+        logger.info("Starting screen sharing")
+        # Placeholder – integrate with actual connection manager
 
-    def _update_system_status(self) -> None:
-        """Update CPU and RAM usage displays."""
+    def _start_remote_control(self):
+        """Initiate remote control session"""
+        logger.info("Starting remote control")
+        # Would open remote control UI
+
+    def _open_files(self):
+        """Open file transfer page"""
+        if self.master._navigation_manager:
+            self.master._navigation_manager.show_page("files")
+
+    def _open_settings(self):
+        """Open settings page"""
+        if self.master._navigation_manager:
+            self.master._navigation_manager.show_page("settings")
+
+    def _show_about(self):
+        """Open about page"""
+        if self.master._navigation_manager:
+            self.master._navigation_manager.show_page("about")
+
+    def _update_system_status(self):
+        """Periodically update CPU and RAM usage stats"""
         cpu = get_cpu_usage()
         ram = get_ram_usage()
-
         self.cpu_value.configure(text=f"{cpu:.1f}%")
         self.ram_value.configure(text=f"{ram[0]:.1f}%")
 
         # Schedule next update
         self.after(1000, self._update_system_status)
 
-    def _on_connect(self) -> None:
-        """Handle connect button click."""
-        if self.parent._navigation_manager:
-            self.parent._navigation_manager.show_page("connection")
+    def _create_widgets(self):
+        """Initial UI setup – split into logical sections"""
+        # Title area already created in __init__
+        # Stats grid already created
+        # Quick actions already added
 
-    def _on_settings(self) -> None:
-        """Handle settings button click."""
-        if self.parent._navigation_manager:
-            self.parent._navigation_manager.show_page("settings")
+        # Footer/status line
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", pady=(0, 20))
 
-    def destroy(self) -> None:
-        """Clean up resources."""
-        super().destroy()
+        status_label = ctk.CTkLabel(
+            self,
+            text="Ready to share your screen",
+            font=ctk.CTkFont(size=14),
+            text_color="#A0A0A0"
+        )
+        status_label.pack(side="left", padx=20)
+
+        # Add a small status icon label
+        status_icon = ctk.CTkLabel(
+            self,
+            text="💻",
+            font=ctk.CTkFont(size=16)
+        )
+        status_icon.pack(side="right", padx=(20, 0))
