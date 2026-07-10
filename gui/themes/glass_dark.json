@@ -1,0 +1,21 @@
+{
+    "name": "Glass Dark",
+    "description": "Modern glassmorphism theme with transparency and blur effects",
+    "background": "#0A0A0A",
+    "sidebar": "#1A1A1A",
+    "card": "#2A2A2A",
+    "border": "#3A3A3A",
+    "primary": "#4A90E2",
+    "success": "#2ECC71",
+    "warning": "#F39C12",
+    "danger": "#E74C3C",
+    "text": "#FFFFFF",
+    "secondary_text": "#A0A0A0",
+    "notification_text": "#FFFFFF",
+    "notification_title": "#FFFFFF",
+    "notification_message": "#A0A0A0",
+    "notification_badge": "#4A90E2",
+    "glass_overlay": "rgba(74, 144, 226, 0.1)",
+    "glass_border": "rgba(255, 255, 255, 0.1)",
+    "glass_blur": "20px"
+}

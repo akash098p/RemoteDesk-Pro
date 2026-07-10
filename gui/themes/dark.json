@@ -1,23 +1,17 @@
 {
     "name": "Dark",
-
     "background": "#171717",
-
     "sidebar": "#1E1E1E",
-
     "card": "#252525",
-
-    "border": "#333333",
-
-    "primary": "#3B82F6",
-
+    "border": "#3B4252",
+    "primary": "#4A90E2",
     "success": "#22C55E",
-
     "warning": "#F59E0B",
-
     "danger": "#EF4444",
-
-    "text": "#FFFFFF",
-
-    "secondary_text": "#A1A1AA"
+    "text": "#E5E5E5",
+    "secondary_text": "#A1A1AA",
+    "notification_text": "#FFFFFF",
+    "notification_title": "#FFFFFF",
+    "notification_message": "#E5E5E5",
+    "notification_badge": "#4A90E2"
 }

@@ -1,0 +1,21 @@
+{
+    "name": "Glass Light",
+    "description": "Modern glassmorphism theme with transparency for light mode",
+    "background": "#F5F5F5",
+    "sidebar": "#E5E5E5",
+    "card": "#FFFFFF",
+    "border": "#D5D5D5",
+    "primary": "#2563EB",
+    "success": "#16A34A",
+    "warning": "#F59E0B",
+    "danger": "#DC2626",
+    "text": "#111827",
+    "secondary_text": "#6B7280",
+    "notification_text": "#111827",
+    "notification_title": "#111827",
+    "notification_message": "#6B7280",
+    "notification_badge": "#2563EB",
+    "glass_overlay": "rgba(37, 99, 235, 0.05)",
+    "glass_border": "rgba(0, 0, 0, 0.1)",
+    "glass_blur": "10px"
+}

@@ -1,23 +1,17 @@
 {
     "name": "Light",
-
-    "background": "#F8F9FA",
-
+    "background": "#F5F5F5",
     "sidebar": "#FFFFFF",
-
     "card": "#FFFFFF",
-
-    "border": "#D1D5DB",
-
+    "border": "#E0E0E0",
     "primary": "#2563EB",
-
-    "success": "#16A34A",
-
+    "success": "#28A75A",
     "warning": "#F59E0B",
-
-    "danger": "#DC2626",
-
+    "danger": "#EF4444",
     "text": "#111827",
-
-    "secondary_text": "#6B7280"
+    "secondary_text": "#6B7280",
+    "notification_text": "#111827",
+    "notification_title": "#111827",
+    "notification_message": "#6B7280",
+    "notification_badge": "#2563EB"
 }
