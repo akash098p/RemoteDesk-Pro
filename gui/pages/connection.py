@@ -93,7 +93,7 @@ class ConnectionPage(ctk.CTkFrame):
             image=ctk.CTkImage(light_image=load_icon("search.png", size=(20,20)),
                               dark_image=load_icon("search.png", size=(20,20)),
                               size=(20,20)),
-            text="Scan Network",
+            text="",
             command=self.scan_network,
             width=180,
             height=40,
@@ -103,7 +103,10 @@ class ConnectionPage(ctk.CTkFrame):
         
         refresh_btn = ctk.CTkButton(
             controls_frame,
-            text="🔄 Refresh",
+            image=ctk.CTkImage(light_image=load_icon("refresh-cw.png", size=(20,20)),
+                              dark_image=load_icon("refresh-cw.png", size=(20,20)),
+                              size=(20,20)),
+            text="Refresh",
             command=self.refresh_connections,
             width=120,
             height=40,
