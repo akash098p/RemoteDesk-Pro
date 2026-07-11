@@ -57,7 +57,7 @@ class DashboardPage(ctk.CTkFrame):
 
         # Title section
         title_frame = ctk.CTkFrame(self, fg_color="transparent")
-        title_frame.pack(fill="x", pady=(20, 10))
+        title_frame.pack(fill="x", padx=20, pady=(0, 5))
 
         title_label = ctk.CTkLabel(
             title_frame,
@@ -65,7 +65,7 @@ class DashboardPage(ctk.CTkFrame):
             font=ctk.CTkFont(size=32, weight="bold"),
             text_color=("#FFFFFF", "#FFFFFF")
         )
-        title_label.pack(padx=20, pady=(10, 5))
+        title_label.pack(padx=20, pady=(0, 5))
 
         # Stats container (using pack instead of grid)
         stats_container = ctk.CTkFrame(self, fg_color="transparent")
