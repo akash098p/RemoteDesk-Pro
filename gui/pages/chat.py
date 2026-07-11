@@ -11,12 +11,11 @@ from __future__ import annotations
 from typing import Callable, Optional
 import os
 import tkinter.filedialog as filedialog
-from pathlib import Path
 from datetime import datetime
 
 import customtkinter as ctk
 import emoji
-from PIL import Image, ImageTk
+from PIL import Image
 
 from core.constants import DEFAULT_FPS, DEFAULT_QUALITY
 from core.logger import get_logger
@@ -46,7 +45,7 @@ class ChatPage(ctk.CTkFrame):
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
-        self.emoji_visible = False  # Track emoji picker state
+        self.emoji_visible = False
         self._create_widgets()
 
     def _create_widgets(self):
@@ -65,7 +64,6 @@ class ChatPage(ctk.CTkFrame):
         header_frame.pack(fill="x")
         header_frame.pack_propagate(False)
 
-        # Chat icon
         chat_icon = load_icon("chat.png", size=(24, 24))
         if chat_icon:
             chat_img = ctk.CTkImage(light_image=chat_icon, dark_image=chat_icon, size=(24, 24))
@@ -199,7 +197,7 @@ class ChatPage(ctk.CTkFrame):
             )
         self.send_btn.pack(side="right", padx=(5, 15), pady=13)
 
-        # Emoji picker (hidden by default)
+        # Emoji picker (hidden by default) - placed as overlay over chat panel
         self.emoji_frame = ctk.CTkFrame(
             self,
             fg_color=("#FFFFFF", "#1F2C34"),
@@ -209,7 +207,6 @@ class ChatPage(ctk.CTkFrame):
             border_width=1,
             border_color=("#E0E0E0", "#2A3942")
         )
-        # Initially hidden - will be shown when emoji button clicked
         self.emoji_frame.place_forget()
 
         # Emoji picker
@@ -217,7 +214,6 @@ class ChatPage(ctk.CTkFrame):
 
     def _create_emoji_picker(self):
         """Create the emoji picker panel with real colorful emojis"""
-        # Tab/header
         header = ctk.CTkLabel(
             self.emoji_frame,
             text="Emojis",
@@ -226,7 +222,6 @@ class ChatPage(ctk.CTkFrame):
         )
         header.pack(pady=(10, 5))
 
-        # Scrollable emoji container
         emoji_scroll = ctk.CTkScrollableFrame(
             self.emoji_frame,
             fg_color="transparent",
@@ -235,7 +230,6 @@ class ChatPage(ctk.CTkFrame):
         )
         emoji_scroll.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Curated emoji list (real unicode emojis - will display in color with proper font)
         emojis = [
             "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰",
             "😘","😗","😋","😜","🤪","😝","🤗","🤔","🤨","😐","😶","🙄","😏","😴","😪","😎",
@@ -245,7 +239,6 @@ class ChatPage(ctk.CTkFrame):
             "📱","💻","⌨️","🖥️","📷","🎥","📁","📂","🗂️","📝","📄","📦","🚀","⚡","☕","🍕"
         ]
 
-        # Create emoji buttons in a grid-like layout
         row_frame = None
         for i, emo in enumerate(emojis):
             if i % 8 == 0:
@@ -265,17 +258,12 @@ class ChatPage(ctk.CTkFrame):
             btn.pack(side="left", padx=2, pady=2)
 
     def _toggle_emoji_picker(self):
-        """Toggle the emoji popup in chat panel"""
+        """Toggle the emoji picker as a popup above the input bar, inside chat panel."""
         if self.emoji_visible:
             self.emoji_frame.place_forget()
         else:
-            # Show emoji picker in upper central area
-            self.emoji_frame.place(
-                relx=0.5,  # center horizontally
-                rely=0.4,  # 40% from top
-                anchor="n"
-            )
-            self.emoji_frame.lift()  # bring to front
+            # Position near bottom-left, above the input bar
+            self.emoji_frame.place(relx=0.02, rely=0.98, anchor="sw")
         self.emoji_visible = not self.emoji_visible
 
     def _add_emoji(self, emo: str):
@@ -297,11 +285,9 @@ class ChatPage(ctk.CTkFrame):
 
     def _add_message(self, text: str, is_outgoing: bool = True, attachment: Optional[str] = None):
         """Add a message bubble to the conversation (WhatsApp/Telegram style)"""
-        # Outer alignment frame
         align_frame = ctk.CTkFrame(self.conversation_area, fg_color="transparent")
         align_frame.pack(fill="x", pady=4, padx=10, anchor="e" if is_outgoing else "w")
 
-        # Bubble
         bubble_color = ("#DCF8C6", "#005C4B") if is_outgoing else ("#E5E5E5", "#3A3A3A")
         bubble = ctk.CTkFrame(
             align_frame,
@@ -311,20 +297,17 @@ class ChatPage(ctk.CTkFrame):
         )
         bubble.pack(side="right" if is_outgoing else "left")
 
-        # Attachment (file)
         if attachment:
             fname = os.path.basename(attachment)
             try:
-                # Load image and maintain original aspect ratio
                 img = Image.open(attachment)
-                img.thumbnail((200, 200), Image.Resampling.LANCZOS)  # Maintains aspect ratio
+                img.thumbnail((200, 200), Image.Resampling.LANCZOS)
                 photo = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
                 img_label = ctk.CTkLabel(bubble, image=photo, text="")
-                img_label.image = photo  # Keep reference
+                img_label.image = photo
                 img_label.pack(padx=10, pady=10)
             except Exception as e:
                 logger.error(f"Failed to load attachment: {e}")
-                # Show filename instead
                 file_label = ctk.CTkLabel(
                     bubble,
                     text=f"📄 {fname}",
@@ -333,9 +316,7 @@ class ChatPage(ctk.CTkFrame):
                 )
                 file_label.pack(padx=12, pady=10)
 
-        # Text with emoji support
         if text:
-            # Use emoji.emojize to ensure proper emoji rendering
             display_text = emoji.emojize(text, language='alias')
             msg_label = ctk.CTkLabel(
                 bubble,
@@ -347,7 +328,6 @@ class ChatPage(ctk.CTkFrame):
             )
             msg_label.pack(padx=12, pady=(8, 2))
 
-        # Time + status
         time_str = datetime.now().strftime("%H:%M")
         meta = ctk.CTkFrame(bubble, fg_color="transparent")
         meta.pack(padx=12, pady=(0, 6), anchor="e")
@@ -369,7 +349,6 @@ class ChatPage(ctk.CTkFrame):
             )
             status.pack(side="left")
 
-        # Scroll to bottom
         self.conversation_area._parent_canvas.yview_moveto(1.0)
 
     def _send_message(self, event=None):
@@ -377,8 +356,5 @@ class ChatPage(ctk.CTkFrame):
         text = self.msg_entry.get().strip()
         if not text:
             return
-
         self.msg_entry.delete(0, ctk.END)
-
-        # Add message to conversation
         self._add_message(text, is_outgoing=True)
