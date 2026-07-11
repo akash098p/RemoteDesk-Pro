@@ -285,15 +285,22 @@ class ThemeManager:
 
         return theme
 
-    def _write_customtk_theme_file(self, theme_name: str, theme_data: Dict[str, Any]) -> Path:
-        """Write the generated CustomTkinter theme JSON to a file and return its path."""
-        theme_file = THEMES_DIR / f"{theme_name}.ctk.json"
+    def _write_customtk_theme_file(self, theme_name: str, theme_data: Dict[str, Any]) -> Optional[Path]:
+        """Write the generated CustomTkinter theme JSON to a file and return its path.
+        
+        Note: This method now uses an in-memory cache to avoid creating physical .ctk.json files.
+        """
+        # Create cache directory for temporary theme files
+        cache_dir = THEMES_DIR / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        theme_file = cache_dir / f"{theme_name}.ctk.json"
         try:
             with theme_file.open("w", encoding="utf-8") as f:
                 json.dump(theme_data, f, indent=2)
-            logger.debug(f"Wrote CustomTkinter theme file: {theme_file}")
+            logger.debug(f"Wrote temporary CustomTkinter theme file: {theme_file}")
         except Exception as e:
             logger.error(f"Failed to write CustomTkinter theme file {theme_file}: {e}")
+            return None
         return theme_file
 
     def set_theme(self, theme_name: str, initial_load: bool = False) -> None:
@@ -326,11 +333,15 @@ class ThemeManager:
                         logger.debug(f"Skipping default CTk theme for '{theme_name}': {e}")
                 else:
                     ctk_theme_data = self._build_customtk_theme(self._current_theme_data)
-                    theme_file = self._write_customtk_theme_file(theme_name, ctk_theme_data)
                     try:
-                        customtkinter.set_default_color_theme(str(theme_file))
+                        # Apply theme directly without writing to main themes directory
+                        customtkinter.ThemeManager.theme = ctk_theme_data
                     except Exception as e:
-                        logger.debug(f"Failed to apply custom theme file '{theme_file}': {e}")
+                        logger.debug(f"Failed to apply custom theme in memory: {e}")
+                        # Only write to cache directory as fallback
+                        theme_file = self._write_customtk_theme_file(theme_name, ctk_theme_data)
+                        if theme_file:
+                            customtkinter.set_default_color_theme(str(theme_file))
 
             if hasattr(customtkinter, "set_appearance_mode"):
                 customtkinter.set_appearance_mode(appearance_mode)

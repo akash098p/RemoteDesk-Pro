@@ -177,7 +177,7 @@ class MainWindow(customtkinter.CTk):
         self._navigation_manager.register_page("dashboard", DashboardPage(self))
         self._navigation_manager.register_page("connection", ConnectionPage(self))
         self._navigation_manager.register_page("screen", ScreenPage(self))
-        self._chat_page = ChatPage(self, app_controller=self)
+        self._chat_page = ChatPage(self)
         self._navigation_manager.register_page("chat", self._chat_page)
         self._navigation_manager.register_page("clipboard", ClipboardPage(self))
         self._navigation_manager.register_page("settings", SettingsPage(self))

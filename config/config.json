@@ -1,7 +1,7 @@
 {
     "app_name": "RemoteDesk Pro",
     "version": "1.0.0",
-    "theme": "nord",
+    "theme": "light",
     "accent": "blue",
     "language": "English",
     "fps": 30,
