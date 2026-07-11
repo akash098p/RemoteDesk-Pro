@@ -45,7 +45,7 @@ class ScreenPage(ctk.CTkFrame):
         """Create and layout the UI elements with glassmorphism styling."""
         # Header with glass effect
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", padx=20, pady=(20, 10))
+        header_frame.pack(fill="x", padx=20, pady=(10, 10))
         
         title = ctk.CTkLabel(
             header_frame,
@@ -63,7 +63,7 @@ class ScreenPage(ctk.CTkFrame):
         self.status_indicator.pack(side="right", padx=10)
         
         # Main content frame with glass effect
-        content_frame = ctk.CTkFrame(self, fg_color=("gray15", "gray85"))
+        content_frame = ctk.CTkFrame(self, fg_color=("gray85", "gray15"))
         content_frame.pack(fill="both", expand=True, padx=20, pady=10)
         
         # FPS Control Section
