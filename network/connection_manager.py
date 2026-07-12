@@ -2,245 +2,626 @@
 ===============================================================================
 RemoteDesk Pro
 File: network/connection_manager.py
-Manages client-server connections and remote control capabilities
+Session transport for screen, chat, audio, and remote input.
 ===============================================================================
 """
 
 from __future__ import annotations
 
+import base64
+import platform
 import socket
 import threading
 import time
 import uuid
-import base64
-from typing import Optional, Dict, Any
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Optional
 
-from network.protocol import RemoteDeskMessage, MessageType, MessageFactory
 from core.constants import DEFAULT_PORT
 from core.logger import get_logger
+from network.ngrok_integration import NgrokIntegration
+from network.packet_system import PacketSystem
+from network.protocol import MessageType, RemoteDeskMessage
 
 logger = get_logger()
 
+
+@dataclass
+class PeerSession:
+    """Connected peer metadata tracked by the session manager."""
+
+    peer_id: str
+    socket: socket.socket
+    address: tuple[str, int]
+    device_name: str = "Remote Device"
+    connected_at: float = field(default_factory=time.time)
+
+
 class ConnectionManager:
-    def __init__(self, server_port: int = DEFAULT_PORT):
-        """
-        Initialize connection manager
-        
-        Args:
-            server_port: Port for the server component
-        """
+    """
+    Real-time session manager for RemoteDesk Pro.
+
+    Features:
+    - LAN host/client TCP transport
+    - Optional public tunnel bootstrap through ngrok
+    - Screen/audio/chat message routing
+    - Incoming mouse/keyboard application on the host
+    """
+
+    def __init__(self, server_port: int = DEFAULT_PORT) -> None:
         self.server_port = server_port
-        self.client_id: Optional[str] = None
-        self.is_server: bool = False
-        self.is_controlling: bool = False
-        self.controlled_client: Optional[str] = None
+        self.device_name = socket.gethostname()
+        self.client_id = str(uuid.uuid4())
+
         self._server_socket: Optional[socket.socket] = None
         self._client_socket: Optional[socket.socket] = None
-        self.clients: Dict[str, socket] = {}
-        self._running: bool = False
-        self._message_queue: list = []
-        self._lock = threading.Lock()
-        self.logger = logger
-        self.logger.info(f"ConnectionManager initialized on port {server_port}")
+        self._client_peer: Optional[PeerSession] = None
+        self._peers: Dict[str, PeerSession] = {}
+        self._receive_threads: Dict[str, threading.Thread] = {}
+        self._running = False
+        self._is_server = False
+        self._is_client = False
+        self._remote_control_enabled = False
+        self._lock = threading.RLock()
+
+        self._callbacks: Dict[str, Optional[Callable[..., None]]] = {
+            "status": None,
+            "screen_frame": None,
+            "chat_message": None,
+            "audio_frame": None,
+            "peer_connected": None,
+            "peer_disconnected": None,
+            "control_request": None,
+        }
+
+        self._mouse_controller = None
+        self._keyboard_controller = None
+        self._ngrok: Optional[NgrokIntegration] = None
+        logger.info(f"ConnectionManager initialized on port {server_port}")
+
+    def register_callback(self, event: str, callback: Callable[..., None]) -> None:
+        """Register a callback for connection/session events."""
+        if event in self._callbacks:
+            self._callbacks[event] = callback
+
+    def _emit(self, event: str, *args: Any) -> None:
+        callback = self._callbacks.get(event)
+        if callback is None:
+            return
+        try:
+            callback(*args)
+        except Exception as exc:
+            logger.error(f"Callback '{event}' failed: {exc}")
+
+    def get_connection_status(self) -> str:
+        """Return a UI-friendly session state."""
+        if self._is_client and self._client_socket:
+            return "connected"
+        if self._peers:
+            return "connected"
+        if self._server_socket:
+            return "hosting"
+        return "idle"
+
+    def get_local_ip(self) -> str:
+        """Best-effort local IPv4 address for LAN sessions."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+        except OSError:
+            return "127.0.0.1"
+        finally:
+            sock.close()
 
     def start_server(self, host: str = "0.0.0.0", port: int = DEFAULT_PORT) -> bool:
-        """Start the server component"""
-        if not self._server_socket:
+        """Start accepting inbound LAN connections."""
+        with self._lock:
+            if self._server_socket is not None:
+                return True
+
             try:
                 self.server_port = port
-                self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self._server_socket.bind((host, port))
-                self._server_socket.listen(5)
-                self._server_socket.setblocking(False)
+                server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                server_socket.bind((host, port))
+                server_socket.listen(10)
+                server_socket.settimeout(1.0)
+                self._server_socket = server_socket
                 self._running = True
-                threading.Thread(target=self._server_accept, daemon=True).start()
-                logger.info(f"Server started on {host}:{self.server_port}")
-                return True
-            except Exception as e:
-                logger.error(f"Failed to start server: {e}")
-                return False
-        return True
-
-    def stop_server(self) -> bool:
-        """Stop the server component"""
-        try:
-            self._running = False
-            if self._server_socket:
-                self._server_socket.close()
-                self._server_socket = None
-            logger.info("Server stopped")
-            return True
-        except Exception as e:
-            logger.error(f"Error stopping server: {e}")
-            return False
-
-    def connect_to_client(self, host: str, port: int) -> bool:
-        """Connect to a remote client"""
-        try:
-            self._client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._client_socket.settimeout(10)
-            self._client_socket.connect((host, port))
-            self._running = True
-            threading.Thread(target=self._client_receive, daemon=True).start()
-            self.client_id = str(uuid.uuid4())
-            self.is_controlling = True
-            logger.info(f"Connected to client at {host}:{port}")
-            return True
-        except Exception as e:
-            logger.error(f"Connection to client failed: {e}")
-            return False
-
-    def send_message(self, message_type: MessageType, payload: dict) -> bool:
-        """Send a message to connected client or server"""
-        try:
-            message = RemoteDeskMessage(message_type, payload)
-            json_data = message.to_json()
-            
-            if self.is_controlling and self._client_socket:
-                self._client_socket.send(json_data.encode())
-            
-            # Also send to any connected clients
-            for client_id, client_socket in list(self.clients.items()):
-                try:
-                    client_socket.send(json_data.encode())
-                except:
-                    self._disconnect_client(client_id)
-                    
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send message: {e}")
-            return False
-
-    def send_screen_frame(self, frame_data: bytes, metadata: dict = None) -> bool:
-        """Send a screen frame message"""
-        return self.send_message(MessageType.SCREEN_FRAME, {
-            "frame_data": base64.b64encode(frame_data).decode(),
-            "metadata": metadata or {}
-        })
-
-    def send_mouse_event(self, x: int, y: int, button: str = "left", action: str = "move") -> bool:
-        """Send a mouse event to remote device"""
-        return self.send_message(MessageType.MOUSE_EVENT, {
-            "x": x, "y": y, "button": button, "action": action
-        })
-
-    def send_keyboard_event(self, key: str, action: str = "press") -> bool:
-        """Send a keyboard event to remote device"""
-        return self.send_message(MessageType.KEYBOARD_EVENT, {
-            "key": key, "action": action
-        })
-
-    def _server_accept(self):
-        """Main server accept loop"""
-        while self._running:
-            try:
-                if not self._server_socket:
-                    break
-                client_socket, addr = self._server_socket.accept()
-                client_socket.setblocking(False)
-                client_id = str(uuid.uuid4())
-                self.clients[client_id] = client_socket
+                self._is_server = True
                 threading.Thread(
-                    target=self._handle_client,
-                    args=(client_id,),
-                    daemon=True
+                    target=self._accept_loop,
+                    name="RemoteDeskAcceptLoop",
+                    daemon=True,
                 ).start()
-                logger.info(f"Client connected: {client_id} from {addr}")
-            except Exception as e:
-                logger.error(f"Server accept error: {e}")
-                break
+                self._emit("status", f"Hosting on {self.get_local_ip()}:{port}", True)
+                logger.info(f"Server started on {host}:{port}")
+                return True
+            except Exception as exc:
+                logger.error(f"Failed to start server: {exc}")
+                self._emit("status", f"Host failed: {exc}", False)
+                return False
 
-    def _handle_client(self, client_id: str):
-        """Handle communication with a client"""
-        client_socket = self.clients[client_id]
-        while True:
+    def connect_to_host(self, host: str, port: int = DEFAULT_PORT) -> bool:
+        """Connect to a remote host over TCP."""
+        try:
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.settimeout(10)
+            client_socket.connect((host, port))
+            client_socket.settimeout(1.0)
+
+            peer = PeerSession(
+                peer_id=str(uuid.uuid4()),
+                socket=client_socket,
+                address=(host, port),
+                device_name=f"{host}:{port}",
+            )
+
+            with self._lock:
+                self._client_socket = client_socket
+                self._client_peer = peer
+                self._running = True
+                self._is_client = True
+
+            thread = threading.Thread(
+                target=self._receive_loop,
+                args=(client_socket, peer.peer_id, False),
+                name="RemoteDeskClientReceive",
+                daemon=True,
+            )
+            self._receive_threads[peer.peer_id] = thread
+            thread.start()
+
+            self._send_hello(client_socket)
+            self._emit("peer_connected", peer)
+            self._emit("status", f"Connected to {host}:{port}", True)
+            logger.info(f"Connected to host {host}:{port}")
+            return True
+        except Exception as exc:
+            logger.error(f"Connection to host failed: {exc}")
+            self._emit("status", f"Connect failed: {exc}", False)
+            return False
+
+    def enable_public_tunnel(self, auth_token: Optional[str] = None, region: str = "us") -> Optional[str]:
+        """Expose the host port publicly when pyngrok is available."""
+        if self._server_socket is None:
+            return None
+
+        if self._ngrok is None:
+            self._ngrok = NgrokIntegration(auth_token=auth_token, region=region)
+
+        if self._ngrok.start_tunnel(port=self.server_port):
+            public_url = self._ngrok.get_public_url()
+            if public_url:
+                self._emit("status", f"Public endpoint ready: {public_url}", True)
+            return public_url
+        return None
+
+    def disable_public_tunnel(self) -> None:
+        """Stop the active public endpoint if present."""
+        if self._ngrok is not None:
+            self._ngrok.stop_tunnel()
+
+    def get_public_endpoint(self) -> Optional[str]:
+        """Return current public endpoint if one exists."""
+        if self._ngrok is None:
+            return None
+        return self._ngrok.get_public_url()
+
+    def has_active_session(self) -> bool:
+        """True when hosting with peers or connected to a host."""
+        return bool(self._peers) or self._client_socket is not None
+
+    def connected_peer_count(self) -> int:
+        """Number of currently connected remote peers."""
+        return len(self._peers) + (1 if self._client_socket else 0)
+
+    def send_screen_frame(self, frame_data: bytes, metadata: Optional[dict] = None) -> bool:
+        """Transmit a compressed screen frame."""
+        payload = {
+            "frame_data": base64.b64encode(frame_data).decode("ascii"),
+            "metadata": metadata or {},
+            "sender": self.device_name,
+            "timestamp": time.time(),
+        }
+        return self._broadcast(RemoteDeskMessage(MessageType.SCREEN_FRAME, payload))
+
+    def send_audio_frame(self, audio_data: bytes, metadata: Optional[dict] = None) -> bool:
+        """Transmit raw PCM audio chunks."""
+        payload = {
+            "audio_data": base64.b64encode(audio_data).decode("ascii"),
+            "metadata": metadata or {},
+            "sender": self.device_name,
+            "timestamp": time.time(),
+        }
+        return self._broadcast(RemoteDeskMessage(MessageType.AUDIO_FRAME, payload))
+
+    def send_chat_message(
+        self,
+        content: str,
+        sender: str,
+        sender_id: Optional[str] = None,
+        message_type: str = "text",
+        metadata: Optional[dict] = None,
+    ) -> bool:
+        """Send a chat message through the active session."""
+        payload = {
+            "sender": sender,
+            "sender_id": sender_id or self.client_id,
+            "content": content,
+            "message_type": message_type,
+            "metadata": metadata or {},
+            "timestamp": time.time(),
+        }
+        return self._broadcast(RemoteDeskMessage(MessageType.CHAT_MESSAGE, payload))
+
+    def send_mouse_event(self, payload: Any = None, **kwargs: Any) -> bool:
+        """Send mouse input to the host or connected peers."""
+        data = self._normalize_mouse_payload(payload, **kwargs)
+        return self._broadcast(RemoteDeskMessage(MessageType.MOUSE_EVENT, data), client_only=True)
+
+    def send_keyboard_event(self, payload: Any = None, **kwargs: Any) -> bool:
+        """Send keyboard input to the host or connected peers."""
+        data = self._normalize_keyboard_payload(payload, **kwargs)
+        return self._broadcast(RemoteDeskMessage(MessageType.KEYBOARD_EVENT, data), client_only=True)
+
+    def request_remote_control(self, requested_by: str) -> bool:
+        """Ask the host to allow remote input control."""
+        message = RemoteDeskMessage(
+            MessageType.CONTROL_REQUEST,
+            {"action": "request", "requested_by": requested_by, "timestamp": time.time()},
+        )
+        return self._broadcast(message, client_only=True)
+
+    def set_remote_control_enabled(self, enabled: bool) -> None:
+        """Enable or disable applying inbound mouse/keyboard events locally."""
+        self._remote_control_enabled = enabled
+        status = "enabled" if enabled else "disabled"
+        logger.info(f"Remote control {status}")
+
+    def disconnect_all(self) -> None:
+        """Close all sockets and reset state."""
+        with self._lock:
+            self._running = False
+            peers = list(self._peers.values())
+            client_socket = self._client_socket
+            server_socket = self._server_socket
+            self._peers.clear()
+            self._client_socket = None
+            self._client_peer = None
+            self._server_socket = None
+            self._is_client = False
+            self._is_server = False
+
+        for peer in peers:
+            self._close_socket(peer.socket)
+        if client_socket is not None:
+            self._close_socket(client_socket)
+        if server_socket is not None:
+            self._close_socket(server_socket)
+
+        self.disable_public_tunnel()
+        self._emit("status", "Idle", False)
+        logger.info("All connections disconnected")
+
+    def disconnect_active_session(self) -> None:
+        """End the current connected session but keep hosting available."""
+        if self._client_socket is not None:
+            client_socket = self._client_socket
+            peer = self._client_peer
+            self._client_socket = None
+            self._client_peer = None
+            self._is_client = False
+            if client_socket is not None:
+                self._close_socket(client_socket)
+            if peer is not None:
+                self._emit("peer_disconnected", peer)
+            self._emit("status", self.get_connection_status().title(), self.has_active_session())
+            return
+
+        with self._lock:
+            peers = list(self._peers.values())
+            self._peers.clear()
+
+        for peer in peers:
+            self._close_socket(peer.socket)
+            self._emit("peer_disconnected", peer)
+
+        self._emit("status", self.get_connection_status().title(), self.has_active_session())
+
+    def get_session_summary(self) -> str:
+        """Human-readable summary for the current session state."""
+        if self._client_peer is not None:
+            return f"Connected to {self._client_peer.device_name}"
+        if self._peers:
+            return f"{len(self._peers)} device(s) connected to this host"
+        if self._server_socket is not None:
+            return f"Hosting on {self.get_local_ip()}:{self.server_port}"
+        return "Idle"
+
+    def _broadcast(self, message: RemoteDeskMessage, client_only: bool = False) -> bool:
+        packet = PacketSystem.create_packet(message.to_dict())
+        if not packet:
+            return False
+
+        sent = False
+        if self._is_client and self._client_socket is not None:
+            sent = self._send_packet(self._client_socket, packet)
+        elif self._is_server:
+            with self._lock:
+                peers = list(self._peers.values())
+            for peer in peers:
+                sent = self._send_packet(peer.socket, packet) or sent
+        return sent
+
+    def _send_packet(self, sock: socket.socket, packet: bytes) -> bool:
+        try:
+            sock.sendall(packet)
+            return True
+        except Exception as exc:
+            logger.error(f"Send failed: {exc}")
+            return False
+
+    def _accept_loop(self) -> None:
+        while self._running and self._server_socket is not None:
             try:
-                data = client_socket.recv(4096)
-                if not data:
-                    break
-                message = RemoteDeskMessage.from_json(data.decode())
-                self.process_message(message)
-            except Exception as e:
-                logger.error(f"Client handler error: {e}")
+                client_socket, address = self._server_socket.accept()
+                client_socket.settimeout(1.0)
+                peer = PeerSession(
+                    peer_id=str(uuid.uuid4()),
+                    socket=client_socket,
+                    address=address,
+                    device_name=f"{address[0]}:{address[1]}",
+                )
+                with self._lock:
+                    self._peers[peer.peer_id] = peer
+                thread = threading.Thread(
+                    target=self._receive_loop,
+                    args=(client_socket, peer.peer_id, True),
+                    name=f"RemoteDeskPeer-{peer.peer_id}",
+                    daemon=True,
+                )
+                self._receive_threads[peer.peer_id] = thread
+                thread.start()
+                self._emit("peer_connected", peer)
+                self._emit("status", f"{len(self._peers)} device(s) connected", True)
+                logger.info(f"Peer connected from {address}")
+            except socket.timeout:
+                continue
+            except OSError:
                 break
-        self._disconnect_client(client_id)
+            except Exception as exc:
+                logger.error(f"Accept loop error: {exc}")
+                break
 
-    def _client_receive(self):
-        """Receive messages from remote client"""
+    def _receive_loop(self, sock: socket.socket, peer_id: str, is_server_side: bool) -> None:
+        buffer = b""
         while self._running:
             try:
-                data = self._client_socket.recv(4096)
-                if not data:
+                chunk = sock.recv(65536)
+                if not chunk:
                     break
-                message = RemoteDeskMessage.from_json(data.decode())
-                self.process_message(message)
-            except Exception as e:
-                logger.error(f"Client receive error: {e}")
+                buffer += chunk
+                buffer = self._consume_buffer(buffer, peer_id, is_server_side)
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            except Exception as exc:
+                logger.error(f"Receive loop error for {peer_id}: {exc}")
                 break
 
-    def process_message(self, message: RemoteDeskMessage):
-        """Process incoming messages based on type"""
-        logger.debug(f"Processing message: {message.type} with payload: {message.payload}")
+        self._handle_disconnect(peer_id, sock, is_server_side)
+
+    def _consume_buffer(self, buffer: bytes, peer_id: str, is_server_side: bool) -> bytes:
+        while len(buffer) >= 4:
+            packet_length = int.from_bytes(buffer[:4], "big")
+            if len(buffer) < 4 + packet_length:
+                return buffer
+            packet = buffer[: 4 + packet_length]
+            buffer = buffer[4 + packet_length :]
+            message_dict = PacketSystem.parse_packet(packet)
+            if not message_dict:
+                continue
+            self._process_message(RemoteDeskMessage.from_dict(message_dict), peer_id, is_server_side)
+        return buffer
+
+    def _process_message(self, message: RemoteDeskMessage, peer_id: str, is_server_side: bool) -> None:
+        if message.type == MessageType.HEARTBEAT:
+            return
         if message.type == MessageType.SCREEN_FRAME:
-            self._handle_screen_frame(message.payload)
-        elif message.type == MessageType.MOUSE_EVENT:
+            self._emit("screen_frame", message.payload)
+            if is_server_side:
+                self._relay_to_other_clients(message, peer_id)
+            return
+        if message.type == MessageType.AUDIO_FRAME:
+            self._emit("audio_frame", message.payload)
+            if is_server_side:
+                self._relay_to_other_clients(message, peer_id)
+            return
+        if message.type == MessageType.CHAT_MESSAGE:
+            self._emit("chat_message", message.payload, peer_id)
+            if is_server_side:
+                self._relay_to_other_clients(message, peer_id)
+            return
+        if message.type == MessageType.MOUSE_EVENT:
             self._handle_mouse_event(message.payload)
-        elif message.type == MessageType.KEYBOARD_EVENT:
+            return
+        if message.type == MessageType.KEYBOARD_EVENT:
             self._handle_keyboard_event(message.payload)
-        elif message.type == MessageType.CONTROL_REQUEST:
-            self._handle_control_request(message.payload)
+            return
+        if message.type == MessageType.CONTROL_REQUEST:
+            self._handle_control_request(message.payload, peer_id, is_server_side)
 
-    def _handle_screen_frame(self, payload: dict):
-        """Handle incoming screen frames"""
-        # This would normally be sent to the screen sharing viewer
-        pass
+    def _relay_to_other_clients(self, message: RemoteDeskMessage, exclude_peer_id: str) -> None:
+        packet = PacketSystem.create_packet(message.to_dict())
+        with self._lock:
+            peers = [peer for peer_id, peer in self._peers.items() if peer_id != exclude_peer_id]
+        for peer in peers:
+            self._send_packet(peer.socket, packet)
 
-    def _handle_mouse_event(self, payload: dict):
-        """Process mouse events from remote device"""
-        logger.info(f"Mouse event received: {payload}")
+    def _handle_mouse_event(self, payload: dict) -> None:
+        if not self._remote_control_enabled:
+            return
+        controller = self._ensure_mouse_controller()
+        if controller is None:
+            return
 
-    def _handle_keyboard_event(self, payload: dict):
-        """Process keyboard events from remote device"""
-        logger.info(f"Keyboard event received: {payload}")
+        action = payload.get("action", payload.get("event_type", "move"))
+        x = int(payload.get("x", 0))
+        y = int(payload.get("y", 0))
+        button = str(payload.get("button", "left")).lower()
 
-    def _handle_control_request(self, payload: dict):
-        """Handle control permission requests"""
-        logger.info(f"Control request received: {payload}")
-
-    def _disconnect_client(self, client_id: str):
-        """Clean up disconnected client"""
-        if client_id in self.clients:
-            try:
-                del self.clients[client_id]
-            except:
-                pass
-
-    def get_connected_clients(self):
-        """Return list of connected client IDs"""
-        return list(self.clients.keys())
-
-    def is_client_active(self) -> bool:
-        """Check if we have an active connection"""
-        return self._client_socket is not None and self.is_controlling
-
-    def get_active_client(self):
-        """Get the current controlled client ID"""
-        return self.controlled_client
-
-    def disconnect_all(self):
-        """Disconnect all clients and stop server"""
         try:
-            self._running = False
-            if self._server_socket:
-                self._server_socket.close()
-            for client_socket in self.clients.values():
-                client_socket.close()
-            self.clients.clear()
-            logger.info("All connections disconnected")
-        except Exception as e:
-            logger.error(f"Error during disconnect: {e}")
+            if action == "move":
+                controller.moveTo(x, y)
+            elif action == "click":
+                controller.click(x=x, y=y, button=button)
+            elif action == "down":
+                controller.mouseDown(x=x, y=y, button=button)
+            elif action == "up":
+                controller.mouseUp(x=x, y=y, button=button)
+            elif action == "scroll":
+                controller.scroll(int(payload.get("delta", payload.get("dy", 0))))
+        except Exception as exc:
+            logger.error(f"Failed to apply mouse event: {exc}")
 
-    def __del__(self):
-        """Destructor to ensure cleanup"""
+    def _handle_keyboard_event(self, payload: dict) -> None:
+        if not self._remote_control_enabled:
+            return
+        action = str(payload.get("action", "press")).lower()
+        key = str(payload.get("key", ""))
+
+        try:
+            if platform.system() == "Windows":
+                import pyautogui
+
+                if action == "press":
+                    pyautogui.keyDown(key)
+                elif action == "release":
+                    pyautogui.keyUp(key)
+                elif action == "tap":
+                    pyautogui.press(key)
+                elif action == "type":
+                    pyautogui.write(key)
+            else:
+                from pynput.keyboard import Controller
+
+                keyboard = Controller()
+                if action == "press":
+                    keyboard.press(key)
+                elif action == "release":
+                    keyboard.release(key)
+                elif action == "tap":
+                    keyboard.press(key)
+                    keyboard.release(key)
+                elif action == "type":
+                    keyboard.type(key)
+        except Exception as exc:
+            logger.error(f"Failed to apply keyboard event: {exc}")
+
+    def _handle_control_request(self, payload: dict, peer_id: str, is_server_side: bool) -> None:
+        if payload.get("action") == "request":
+            self._emit("control_request", payload, peer_id)
+            self.set_remote_control_enabled(True)
+            if is_server_side:
+                response = RemoteDeskMessage(
+                    MessageType.CONTROL_REQUEST,
+                    {
+                        "action": "granted",
+                        "requested_by": payload.get("requested_by", "remote"),
+                        "timestamp": time.time(),
+                    },
+                )
+                peer = self._peers.get(peer_id)
+                if peer is not None:
+                    self._send_packet(peer.socket, PacketSystem.create_packet(response.to_dict()))
+        elif payload.get("action") == "granted":
+            self._emit("status", "Remote control granted", True)
+
+    def _ensure_mouse_controller(self):
+        if self._mouse_controller is not None:
+            return self._mouse_controller
+        try:
+            import pyautogui
+
+            pyautogui.FAILSAFE = False
+            self._mouse_controller = pyautogui
+            return self._mouse_controller
+        except Exception as exc:
+            logger.error(f"Mouse controller unavailable: {exc}")
+            return None
+
+    def _send_hello(self, sock: socket.socket) -> None:
+        hello = RemoteDeskMessage(
+            MessageType.HEARTBEAT,
+            {
+                "device_name": self.device_name,
+                "client_id": self.client_id,
+                "timestamp": time.time(),
+            },
+        )
+        self._send_packet(sock, PacketSystem.create_packet(hello.to_dict()))
+
+    def _handle_disconnect(self, peer_id: str, sock: socket.socket, is_server_side: bool) -> None:
+        self._close_socket(sock)
+        with self._lock:
+            if is_server_side:
+                peer = self._peers.pop(peer_id, None)
+            else:
+                peer = self._client_peer
+                self._client_peer = None
+                self._client_socket = None
+                self._is_client = False
+
+        if peer is not None:
+            self._emit("peer_disconnected", peer)
+        self._emit("status", self.get_connection_status().title(), self.has_active_session())
+
+    def _close_socket(self, sock: socket.socket) -> None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except Exception:
+            pass
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+    def _normalize_mouse_payload(self, payload: Any = None, **kwargs: Any) -> dict:
+        if isinstance(payload, dict):
+            data = dict(payload)
+        elif payload is not None and hasattr(payload, "__dict__"):
+            data = dict(payload.__dict__)
+        else:
+            data = {}
+        data.update(kwargs)
+        if "event_type" in data and "action" not in data:
+            data["action"] = data["event_type"]
+        return {
+            "action": data.get("action", "move"),
+            "x": int(data.get("x", 0)),
+            "y": int(data.get("y", 0)),
+            "button": str(data.get("button", "left")),
+            "delta": int(data.get("delta", data.get("dy", 0))),
+        }
+
+    def _normalize_keyboard_payload(self, payload: Any = None, **kwargs: Any) -> dict:
+        if isinstance(payload, dict):
+            data = dict(payload)
+        elif payload is not None and hasattr(payload, "__dict__"):
+            data = dict(payload.__dict__)
+        else:
+            data = {}
+        data.update(kwargs)
+        action = str(data.get("action", data.get("type", "tap"))).lower()
+        if action == "combo":
+            action = "type"
+        return {
+            "action": action,
+            "key": str(data.get("key", "")),
+        }
+
+    def __del__(self) -> None:
         self.disconnect_all()
