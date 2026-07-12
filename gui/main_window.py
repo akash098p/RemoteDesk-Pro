@@ -150,6 +150,7 @@ class MainWindow(customtkinter.CTk):
             self,
             fg_color=self._theme_manager.get_color("background", "#0D0D0D"),
         )
+        self.content_frame._theme_manager = self._theme_manager
         self.content_frame.pack(fill="both", expand=True)
 
         # Create status bar
@@ -171,18 +172,19 @@ class MainWindow(customtkinter.CTk):
         from gui.pages.clipboard import ClipboardPage
 
         # Create navigation manager
-        self._navigation_manager = NavigationManager(self, self.sidebar)
+        self._navigation_manager = NavigationManager(self.content_frame, self.sidebar)
+        self.content_frame._navigation_manager = self._navigation_manager
 
         # Register pages
-        self._navigation_manager.register_page("dashboard", DashboardPage(self))
-        self._navigation_manager.register_page("connection", ConnectionPage(self))
-        self._navigation_manager.register_page("screen", ScreenPage(self))
-        self._chat_page = ChatPage(self)
+        self._navigation_manager.register_page("dashboard", DashboardPage(self.content_frame))
+        self._navigation_manager.register_page("connection", ConnectionPage(self.content_frame))
+        self._navigation_manager.register_page("screen", ScreenPage(self.content_frame))
+        self._chat_page = ChatPage(self.content_frame)
         self._navigation_manager.register_page("chat", self._chat_page)
-        self._navigation_manager.register_page("clipboard", ClipboardPage(self))
-        self._navigation_manager.register_page("settings", SettingsPage(self))
-        self._navigation_manager.register_page("logs", LogsPage(self))
-        self._navigation_manager.register_page("about", AboutPage(self))
+        self._navigation_manager.register_page("clipboard", ClipboardPage(self.content_frame))
+        self._navigation_manager.register_page("settings", SettingsPage(self.content_frame))
+        self._navigation_manager.register_page("logs", LogsPage(self.content_frame))
+        self._navigation_manager.register_page("about", AboutPage(self.content_frame))
 
         # Show dashboard
         self._navigation_manager.show_page("dashboard")
