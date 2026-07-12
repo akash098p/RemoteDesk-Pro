@@ -8,11 +8,15 @@ About page with project information and creator links.
 
 from __future__ import annotations
 
+import os
 import webbrowser
 
 import customtkinter as ctk
+from PIL import Image
 
 from core.constants import APP_VERSION
+
+ICONS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icons")
 
 
 class AboutPage(ctk.CTkFrame):
@@ -20,6 +24,7 @@ class AboutPage(ctk.CTkFrame):
 
     def __init__(self, master, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
+        self._social_icons: list[ctk.CTkImage] = []
         self._create_widgets()
 
     def _create_widgets(self):
@@ -122,20 +127,12 @@ class AboutPage(ctk.CTkFrame):
         links_row = ctk.CTkFrame(creator, fg_color="transparent")
         links_row.pack(fill="x", padx=22, pady=(0, 18))
 
-        for text, url in [
-            ("GitHub", "https://github.com/akash098p/RemoteDesk-Pro"),
-            ("Instagram", "https://instagram.com/akash.098p"),
-            ("Email", "mailto:akashpramanik098@gmail.com"),
+        for title, label, url, icon_name in [
+            ("GitHub", "akash098p/RemoteDesk-Pro", "https://github.com/akash098p/RemoteDesk-Pro", "GitHub-logo.png"),
+            ("Instagram", "@akash.098p", "https://instagram.com/akash.098p", "Instagram-Logo.png"),
+            ("Gmail", "akashpramanik098@gmail.com", "mailto:akashpramanik098@gmail.com", "Gmail-Logo.png"),
         ]:
-            ctk.CTkButton(
-                links_row,
-                text=text,
-                width=140,
-                height=38,
-                command=lambda link=url: webbrowser.open(link),
-                fg_color=("#2F7DDA", "#243E5B"),
-                hover_color=("#276BBB", "#2C5073"),
-            ).pack(side="left", padx=(0, 10))
+            self._create_social_link(links_row, title, label, url, icon_name)
 
         support = ctk.CTkFrame(scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=18)
         support.pack(fill="x")
@@ -188,3 +185,53 @@ class AboutPage(ctk.CTkFrame):
             ).pack(fill="x", padx=18, pady=3)
 
         ctk.CTkLabel(card, text="").pack(pady=(0, 10))
+
+    def _create_social_link(
+        self,
+        parent,
+        title: str,
+        label: str,
+        url: str,
+        icon_name: str,
+    ) -> None:
+        card = ctk.CTkFrame(parent, fg_color=("white", "#14191F"), corner_radius=14)
+        card.pack(side="left", fill="y", padx=(0, 12))
+
+        icon = self._load_social_icon(icon_name)
+
+        ctk.CTkButton(
+            card,
+            text="",
+            image=icon,
+            width=54,
+            height=54,
+            corner_radius=14,
+            command=lambda link=url: webbrowser.open(link),
+            fg_color=("white", "#1D232B"),
+            hover_color=("#E8EDF5", "#2A3440"),
+        ).pack(padx=14, pady=(14, 10))
+
+        ctk.CTkLabel(
+            card,
+            text=title,
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="center", padx=14)
+
+        ctk.CTkLabel(
+            card,
+            text=label,
+            font=ctk.CTkFont(size=11),
+            text_color=("#5B6574", "#AEB8C5"),
+            wraplength=150,
+            justify="center",
+        ).pack(anchor="center", padx=10, pady=(4, 14))
+
+    def _load_social_icon(self, icon_name: str) -> ctk.CTkImage | None:
+        icon_path = os.path.join(ICONS_DIR, icon_name)
+        if not os.path.exists(icon_path):
+            return None
+
+        image = Image.open(icon_path).convert("RGBA")
+        icon = ctk.CTkImage(light_image=image, dark_image=image, size=(36, 36))
+        self._social_icons.append(icon)
+        return icon
