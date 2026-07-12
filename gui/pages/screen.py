@@ -27,6 +27,9 @@ logger = get_logger()
 class ScreenPage(ctk.CTkFrame):
     """Screen sharing page with live preview and remote control support."""
 
+    STREAM_MAX_DIMENSION = 1920
+    STREAM_FORMAT = "WEBP"
+
     def __init__(self, master):
         super().__init__(master)
         self._fps = DEFAULT_FPS
@@ -38,6 +41,7 @@ class ScreenPage(ctk.CTkFrame):
         self._control_enabled = False
         self._audio_capture = None
         self._remote_audio = None
+        self._last_mouse_send = 0.0
         self._create_widgets()
 
     @property
@@ -241,12 +245,26 @@ class ScreenPage(ctk.CTkFrame):
                     start_time = time.time()
                     screenshot = mss_instance.grab(monitor)
                     image = Image.frombytes("RGB", screenshot.size, screenshot.rgb, "raw", "BGR")
+                    original_width, original_height = image.width, image.height
+                    image = self._prepare_frame(image)
                     buffer = io.BytesIO()
-                    image.save(buffer, format="JPEG", quality=self._quality)
+                    image.save(
+                        buffer,
+                        format=self.STREAM_FORMAT,
+                        quality=self._quality,
+                        method=6,
+                    )
                     if self._connection_manager:
                         self._connection_manager.send_screen_frame(
                             buffer.getvalue(),
-                            metadata={"width": image.width, "height": image.height},
+                            metadata={
+                                "width": image.width,
+                                "height": image.height,
+                                "original_width": original_width,
+                                "original_height": original_height,
+                                "format": self.STREAM_FORMAT.lower(),
+                                "quality": self._quality,
+                            },
                         )
                     elapsed = time.time() - start_time
                     delay = max(0.0, 1.0 / self._fps - elapsed)
@@ -256,6 +274,21 @@ class ScreenPage(ctk.CTkFrame):
                     logger.error(f"Screen capture error: {exc}")
                     self.after(0, self._stop_sharing)
                     break
+
+    def _prepare_frame(self, image: Image.Image) -> Image.Image:
+        """Resize oversized frames before encoding to keep quality stable."""
+        max_dimension = self.STREAM_MAX_DIMENSION
+        width, height = image.size
+        largest_side = max(width, height)
+        if largest_side <= max_dimension:
+            return image
+
+        scale = max_dimension / float(largest_side)
+        resized = image.resize(
+            (max(1, int(width * scale)), max(1, int(height * scale))),
+            Image.Resampling.LANCZOS,
+        )
+        return resized
 
     def handle_remote_frame(self, payload: dict) -> None:
         """Render a frame received from a connected device."""
@@ -333,9 +366,13 @@ class ScreenPage(ctk.CTkFrame):
     def _on_remote_mouse_move(self, event) -> None:
         if not self._control_enabled or self._connection_manager is None:
             return
+        now = time.time()
+        if now - self._last_mouse_send < 0.015:
+            return
         coords = self._map_event_to_remote(event)
         if coords is None:
             return
+        self._last_mouse_send = now
         self._connection_manager.send_mouse_event(x=coords[0], y=coords[1], action="move")
 
     def _on_remote_click(self, event) -> None:
