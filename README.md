@@ -242,7 +242,7 @@ RemoteDesk-Pro/
 
 ---
 
-## 🚧 Phase 7 — Remote Control
+## ✅ Phase 7 — Remote Control
 
 - Remote Mouse
 - Remote Keyboard
@@ -251,7 +251,7 @@ RemoteDesk-Pro/
 
 ---
 
-## ⏳ Phase 8 — Polishing & Release
+## 🚧 Phase 8 — Polishing & Release
 
 - Audio Streaming
 - Notifications
