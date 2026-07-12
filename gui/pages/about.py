@@ -2,200 +2,189 @@
 ===============================================================================
 RemoteDesk Pro
 File: gui/pages/about.py
-Premium About page with modern glassmorphism UI
+About page with project information and creator links.
 ===============================================================================
 """
 
 from __future__ import annotations
 
-import customtkinter as ctk
 import webbrowser
-from typing import Callable
+
+import customtkinter as ctk
+
+from core.constants import APP_VERSION
 
 
 class AboutPage(ctk.CTkFrame):
-    """
-    Premium about/help page with detailed information and modern styling.
-    """
+    """About and support page."""
 
     def __init__(self, master, **kwargs):
-        super().__init__(master, **kwargs)
+        super().__init__(master, fg_color="transparent", **kwargs)
         self._create_widgets()
 
     def _create_widgets(self):
-        """Create the premium about page layout."""
-        # Main container with subtle padding
-        main_frame = ctk.CTkFrame(self, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True, padx=50, pady=30)
+        scroll_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll_frame.pack(fill="both", expand=True, padx=18, pady=(12, 10))
 
-        # Header section with logo and title
-        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(30, 50))
+        hero = ctk.CTkFrame(scroll_frame, fg_color=("#F4F7FB", "#1D232B"), corner_radius=18)
+        hero.pack(fill="x", pady=(0, 12))
 
-        logo_label = ctk.CTkLabel(
-            header_frame,
-            text="🖥️",
-            font=ctk.CTkFont(size=80, weight="bold"),
-            text_color="#4A90E2"
+        ctk.CTkLabel(
+            hero,
+            text="About RemoteDesk Pro",
+            font=ctk.CTkFont(size=30, weight="bold"),
+        ).pack(anchor="w", padx=24, pady=(20, 6))
+
+        ctk.CTkLabel(
+            hero,
+            text="A modern Python desktop app for remote access, live screen sharing, chat, file transfer, clipboard sync, and future audio collaboration.",
+            font=ctk.CTkFont(size=13),
+            text_color=("#5B6574", "#AEB8C5"),
+            wraplength=920,
+            justify="left",
+        ).pack(anchor="w", padx=24, pady=(0, 18))
+
+        overview = ctk.CTkFrame(scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=18)
+        overview.pack(fill="x", pady=(0, 12))
+        overview.grid_columnconfigure(0, weight=1)
+        overview.grid_columnconfigure(1, weight=1)
+
+        self._info_block(
+            overview,
+            0,
+            "Project",
+            [
+                "RemoteDesk Pro",
+                f"Version {APP_VERSION}",
+                "Inspired by AnyDesk, TeamViewer, and Chrome Remote Desktop.",
+            ],
         )
-        logo_label.pack()
-
-        title = ctk.CTkLabel(
-            header_frame,
-            text="RemoteDesk Pro",
-            font=ctk.CTkFont(size=48, weight="bold"),
-            text_color=("#FFFFFF", "#FFFFFF")
+        self._info_block(
+            overview,
+            1,
+            "Core Capabilities",
+            [
+                "Screen sharing and remote control",
+                "Chat, clipboard sync, and file transfer",
+                "LAN and public endpoint connectivity",
+            ],
         )
-        title.pack(pady=(15, 10))
 
-        tagline = ctk.CTkLabel(
-            header_frame,
-            text="Professional Remote Desktop & Screen Sharing Solution",
-            font=ctk.CTkFont(size=18),
-            text_color=("#A0A0A0", "#CCCCCC")
-        )
-        tagline.pack(pady=10)
+        features_card = ctk.CTkFrame(scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=18)
+        features_card.pack(fill="x", pady=(0, 12))
 
-        # Version card with glass effect
-        version_frame = ctk.CTkFrame(
-            main_frame,
-            fg_color=("#2A2A2A", "#F5F5F5"),
-            corner_radius=20,
-            border_width=0
-        )
-        version_frame.pack(fill="x", pady=30)
-
-        version_title = ctk.CTkLabel(
-            version_frame,
-            text="Version",
+        ctk.CTkLabel(
+            features_card,
+            text="Feature Highlights",
             font=ctk.CTkFont(size=22, weight="bold"),
-            text_color=("#F5F5F5", "#111111")
-        )
-        version_title.pack(pady=(25, 5))
+        ).pack(anchor="w", padx=22, pady=(18, 10))
 
-        version_num = ctk.CTkLabel(
-            version_frame,
-            text="2.0.0",
-            font=ctk.CTkFont(size=32, weight="bold"),
-            text_color="#4A90E2"
-        )
-        version_num.pack(pady=(5, 25))
+        for line in [
+            "High-quality desktop streaming with adjustable FPS and quality.",
+            "Permission-based remote control with keyboard and mouse support.",
+            "Two-way chat and attachments during remote sessions.",
+            "Clipboard and file workflows designed for collaboration.",
+            "Cross-network access through public TCP tunneling.",
+        ]:
+            ctk.CTkLabel(
+                features_card,
+                text=f"- {line}",
+                font=ctk.CTkFont(size=13),
+                anchor="w",
+                justify="left",
+                wraplength=920,
+            ).pack(fill="x", padx=22, pady=4)
 
-        # Features section
-        features_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        features_frame.pack(fill="both", expand=True, pady=30)
-
-        features = [
-            ("🖥️", "Screen Sharing", "Share your desktop in real-time with high quality"),
-            ("🎮", "Remote Control", "Control computers from anywhere securely"),
-            ("💬", "Instant Chat", "Communicate with connected devices instantly"),
-            ("📁", "File Transfer", "Drag-and-drop file transfers with resume support"),
-            ("🎵", "Audio Sync", "Real-time microphone streaming during sessions"),
-            ("🔒", "Security", "End-to-end encrypted connection protocol")
-        ]
-
-        # Create feature cards
-        feature_cards = []
-        for icon, title, description in features:
-            card = self._create_feature_card(features_frame, icon, title, description)
-            feature_cards.append(card)
-
-        # Layout in grid
-        for i, card in enumerate(feature_cards):
-            row = i // 2
-            col = i % 2
-            card.grid(row=row, column=col, padx=15, pady=15, sticky="nsew")
-
-        features_frame.columnconfigure(0, weight=1)
-        features_frame.columnconfigure(1, weight=1)
-
-        # Contact section
-        contact_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        contact_frame.pack(fill="x", pady=30)
+        creator = ctk.CTkFrame(scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=18)
+        creator.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
-            contact_frame,
-            text="Contact & Support",
+            creator,
+            text="Maker",
+            font=ctk.CTkFont(size=22, weight="bold"),
+        ).pack(anchor="w", padx=22, pady=(18, 8))
+
+        ctk.CTkLabel(
+            creator,
+            text="Akash Pramanik",
             font=ctk.CTkFont(size=20, weight="bold"),
-            text_color=("#E0E0E0", "#FFFFFF")
-        ).pack(pady=(10, 20))
-
-        contact_info = ["📧 support@remotedesk.pro", "🌐 www.remotedesk.pro", "🐙 GitHub: /remotedesk-pro"]
-
-        for info in contact_info:
-            label = ctk.CTkLabel(
-                contact_frame,
-                text=info,
-                font=ctk.CTkFont(size=14),
-                text_color=("#0880FF", "#E0E0E0")
-            )
-            label.pack(pady=5)
-
-        # Quick links section
-        links_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        links_frame.pack(fill="x", pady=30)
-
-        link_title = ctk.CTkLabel(
-            links_frame,
-            text="Quick Links",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=("#0880FF", "#E0E0E0")
-        )
-        link_title.pack(pady=(10, 15))
-
-        link_buttons = [
-            ("📚 Documentation", "https://remotedesk.pro/docs"),
-            ("🚀 Getting Started", "https://remotedesk.pro/start"),
-            ("❓ FAQ", "https://remotedesk.pro/faq")
-        ]
-
-        for link_text, url in link_buttons:
-            link_btn = ctk.CTkButton(
-                links_frame,
-                text=link_text,
-                font=ctk.CTkFont(size=14),
-                height=35,
-                width=200,
-                fg_color=("#0880FF", "#2A4A6A"),
-                command=lambda u=url: webbrowser.open(u)
-            )
-            link_btn.pack(pady=8)
-
-        # Footer
-        credits_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        credits_frame.pack(fill="x", pady=40)
+        ).pack(anchor="w", padx=22, pady=(0, 4))
 
         ctk.CTkLabel(
-            credits_frame,
-            text="© 2024 RemoteDesk Pro. All rights reserved.",
+            creator,
+            text="Open-source developer building RemoteDesk Pro as a modern remote collaboration platform.",
+            font=ctk.CTkFont(size=13),
+            text_color=("#5B6574", "#AEB8C5"),
+            wraplength=920,
+            justify="left",
+        ).pack(anchor="w", padx=22, pady=(0, 14))
+
+        links_row = ctk.CTkFrame(creator, fg_color="transparent")
+        links_row.pack(fill="x", padx=22, pady=(0, 18))
+
+        for text, url in [
+            ("GitHub", "https://github.com/akash098p/RemoteDesk-Pro"),
+            ("Instagram", "https://instagram.com/akash.098p"),
+            ("Email", "mailto:akashpramanik098@gmail.com"),
+        ]:
+            ctk.CTkButton(
+                links_row,
+                text=text,
+                width=140,
+                height=38,
+                command=lambda link=url: webbrowser.open(link),
+                fg_color=("#2F7DDA", "#243E5B"),
+                hover_color=("#276BBB", "#2C5073"),
+            ).pack(side="left", padx=(0, 10))
+
+        support = ctk.CTkFrame(scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=18)
+        support.pack(fill="x")
+
+        ctk.CTkLabel(
+            support,
+            text="Support the Project",
+            font=ctk.CTkFont(size=22, weight="bold"),
+        ).pack(anchor="w", padx=22, pady=(18, 10))
+
+        for line in [
+            "Star the repository if the project is useful to you.",
+            "Report issues when you find a bug or session problem.",
+            "Suggest new features to help shape the roadmap.",
+        ]:
+            ctk.CTkLabel(
+                support,
+                text=f"- {line}",
+                font=ctk.CTkFont(size=13),
+                anchor="w",
+                justify="left",
+                wraplength=920,
+            ).pack(fill="x", padx=22, pady=4)
+
+        ctk.CTkLabel(
+            support,
+            text="MIT License",
             font=ctk.CTkFont(size=12),
-            text_color=("#888888", "#666666")
-        ).pack()
+            text_color=("#5B6574", "#AEB8C5"),
+        ).pack(anchor="w", padx=22, pady=(10, 18))
 
-    def _create_feature_card(self, parent, icon: str, title: str, description: str) -> ctk.CTkFrame:
-        """Create a premium feature card."""
-        card = ctk.CTkFrame(
-            parent,
-            fg_color=("#2A2A2A", "#F5F5F5"),
-            corner_radius=20,
-            border_width=1,
-            border_color=("#404040", "#DDDDDD")
-        )
-        card.pack_propagate(False)
+    def _info_block(self, parent, column: int, title: str, lines: list[str]) -> None:
+        card = ctk.CTkFrame(parent, fg_color=("white", "#14191F"), corner_radius=14)
+        card.grid(row=0, column=column, sticky="nsew", padx=8, pady=8)
 
-        icon_label = ctk.CTkLabel(card, text=icon, font=ctk.CTkFont(size=32))
-        icon_label.pack(pady=(20, 10))
-
-        title_label = ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=16, weight="bold"))
-        title_label.pack(pady=(0, 8))
-
-        desc_label = ctk.CTkLabel(
+        ctk.CTkLabel(
             card,
-            text=description,
-            font=ctk.CTkFont(size=12),
-            text_color=("#CCCCCC", "#666666"),
-            wraplength=200
-        )
-        desc_label.pack(padx=20, pady=(0, 20))
+            text=title,
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 10))
 
-        return card
+        for line in lines:
+            ctk.CTkLabel(
+                card,
+                text=line,
+                font=ctk.CTkFont(size=13),
+                justify="left",
+                anchor="w",
+                wraplength=360,
+            ).pack(fill="x", padx=18, pady=3)
+
+        ctk.CTkLabel(card, text="").pack(pady=(0, 10))
