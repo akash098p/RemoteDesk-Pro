@@ -69,9 +69,9 @@ class NgrokIntegration:
             
             # Start tunnel
             if proto == "http":
-                self._tunnel = ngrok.connect(port, proto)
+                self._tunnel = ngrok.connect(addr=port, proto="http")
             else:
-                self._tunnel = ngrok.connect(port)
+                self._tunnel = ngrok.connect(addr=port, proto="tcp")
             
             if self._tunnel:
                 self._public_url = self._tunnel.public_url
