@@ -1,0 +1,7 @@
+# Optional audio dependencies.
+# These may not install on Windows x86 / Python 3.14 because wheel support is limited.
+# Install them only on a compatible environment if you want live audio sharing.
+
+numpy==2.3.1
+PyAudio==0.2.14
+sounddevice==0.5.2
