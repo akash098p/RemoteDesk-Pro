@@ -11,6 +11,7 @@ the application lifecycle. This is the central hub of the GUI.
 from __future__ import annotations
 
 import os
+import tkinter.messagebox as messagebox
 from typing import TYPE_CHECKING
 
 import customtkinter
@@ -243,14 +244,25 @@ class MainWindow(customtkinter.CTk):
         )
         self.connection_manager.register_callback(
             "control_request",
-            lambda payload, peer_id=None: self.after(
-                0,
-                lambda: NotificationManager.get_instance().show_info(
-                    f"{payload.get('requested_by', 'Remote user')} requested control access.",
-                    title="Remote Control",
-                ),
-            ),
+            lambda payload, peer_id=None: self.after(0, lambda: self._handle_control_request(payload, peer_id)),
         )
+
+    def _handle_control_request(self, payload: dict, peer_id: str | None) -> None:
+        """Prompt before granting remote mouse/keyboard access."""
+        requested_by = payload.get("requested_by", "Remote user")
+        NotificationManager.get_instance().show_info(
+            f"{requested_by} requested control access.",
+            title="Remote Control",
+        )
+        if peer_id is None:
+            return
+
+        granted = messagebox.askyesno(
+            "Remote Control Request",
+            f"Allow {requested_by} to control this device?\n\n"
+            "They will be able to use mouse and keyboard input until you disconnect.",
+        )
+        self.connection_manager.respond_to_control_request(peer_id, granted, requested_by=requested_by)
 
     def _connect_to_device(self, host: str, port: int) -> bool:
         """Connect to a remote host from the connection page."""
