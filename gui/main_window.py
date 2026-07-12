@@ -18,6 +18,7 @@ import customtkinter
 from core.constants import (
     APP_NAME,
     APP_VERSION,
+    DEFAULT_PORT,
     WINDOW_WIDTH,
     WINDOW_HEIGHT,
     WINDOW_MIN_WIDTH,
@@ -30,6 +31,7 @@ from gui.components.titlebar import TitleBar
 from gui.components.sidebar import Sidebar
 from gui.components.statusbar import StatusBar
 from gui.components.notifications import NotificationManager
+from network.connection_manager import ConnectionManager
 
 if TYPE_CHECKING:
     from gui.pages.dashboard import DashboardPage
@@ -97,7 +99,9 @@ class MainWindow(customtkinter.CTk):
         self.config_manager = config_manager
         self._theme_manager = get_theme_manager()
         self._navigation_manager: NavigationManager | None = None
+        self.connection_manager = ConnectionManager(DEFAULT_PORT)
         self._chat_page: "ChatPage" | None = None
+        self._screen_page: "ScreenPage" | None = None
         self.username = self.config_manager.get_value("config", "username", "Local")
         self._is_running = False
 
@@ -150,7 +154,9 @@ class MainWindow(customtkinter.CTk):
             self,
             fg_color=self._theme_manager.get_color("background", "#0D0D0D"),
         )
+        self.content_frame._app = self
         self.content_frame._theme_manager = self._theme_manager
+        self.content_frame._connection_manager = self.connection_manager
         self.content_frame.pack(fill="both", expand=True)
 
         # Create status bar
@@ -177,8 +183,12 @@ class MainWindow(customtkinter.CTk):
 
         # Register pages
         self._navigation_manager.register_page("dashboard", DashboardPage(self.content_frame))
-        self._navigation_manager.register_page("connection", ConnectionPage(self.content_frame))
-        self._navigation_manager.register_page("screen", ScreenPage(self.content_frame))
+        self._navigation_manager.register_page(
+            "connection",
+            ConnectionPage(self.content_frame, on_connect=self._connect_to_device),
+        )
+        self._screen_page = ScreenPage(self.content_frame)
+        self._navigation_manager.register_page("screen", self._screen_page)
         self._chat_page = ChatPage(self.content_frame)
         self._navigation_manager.register_page("chat", self._chat_page)
         self._navigation_manager.register_page("clipboard", ClipboardPage(self.content_frame))
@@ -186,8 +196,68 @@ class MainWindow(customtkinter.CTk):
         self._navigation_manager.register_page("logs", LogsPage(self.content_frame))
         self._navigation_manager.register_page("about", AboutPage(self.content_frame))
 
+        if self._chat_page is not None:
+            self._chat_page.set_send_callback(self.send_chat_message)
+
+        self._register_connection_callbacks()
+        self.connection_manager.start_server(port=DEFAULT_PORT)
+
         # Show dashboard
         self._navigation_manager.show_page("dashboard")
+
+    def _register_connection_callbacks(self) -> None:
+        """Route connection events into the active GUI pages."""
+        self.connection_manager.register_callback(
+            "status",
+            lambda status, ok=True: self.after(
+                0, lambda: self.status_bar.set_connection_status(status, is_connected=ok)
+            ),
+        )
+        self.connection_manager.register_callback(
+            "screen_frame",
+            lambda payload: self.after(
+                0, lambda: self._screen_page and self._screen_page.handle_remote_frame(payload)
+            ),
+        )
+        self.connection_manager.register_callback(
+            "audio_frame",
+            lambda payload: self.after(
+                0, lambda: self._screen_page and self._screen_page.handle_remote_audio(payload)
+            ),
+        )
+        self.connection_manager.register_callback(
+            "chat_message",
+            lambda payload, peer_id=None: self.after(
+                0, lambda: self._chat_page and self._chat_page.receive_network_message(payload)
+            ),
+        )
+        self.connection_manager.register_callback(
+            "peer_disconnected",
+            lambda peer: self.after(
+                0,
+                lambda: NotificationManager.get_instance().show_info(
+                    f"{peer.device_name} disconnected.",
+                    title="Connection",
+                ),
+            ),
+        )
+        self.connection_manager.register_callback(
+            "control_request",
+            lambda payload, peer_id=None: self.after(
+                0,
+                lambda: NotificationManager.get_instance().show_info(
+                    f"{payload.get('requested_by', 'Remote user')} requested control access.",
+                    title="Remote Control",
+                ),
+            ),
+        )
+
+    def _connect_to_device(self, host: str, port: int) -> bool:
+        """Connect to a remote host from the connection page."""
+        connected = self.connection_manager.connect_to_host(host, port)
+        if connected and self._navigation_manager:
+            self._navigation_manager.show_page("screen")
+        return connected
 
     def _on_sidebar_click(self, page_key: str) -> None:
         """Handle sidebar navigation clicks."""
@@ -210,24 +280,43 @@ class MainWindow(customtkinter.CTk):
             return
 
         try:
-            # Future integration point for a dedicated ChatManager
-            if hasattr(self, "chat_manager") and getattr(self, "chat_manager") is not None:
-                self.chat_manager.send_message(content)
+            if self.connection_manager.has_active_session():
+                self.connection_manager.send_chat_message(
+                    content=content,
+                    sender=self.username,
+                    sender_id=self.connection_manager.client_id,
+                )
+                self._chat_page.receive_network_message(
+                    {
+                        "sender": self.username,
+                        "sender_id": self.connection_manager.client_id,
+                        "content": content,
+                        "message_type": "text",
+                        "metadata": {},
+                    }
+                )
                 return
         except Exception:
             pass
 
         # Local fallback display
-        from chat.message import ChatMessage
-
-        message = ChatMessage(sender=self.username, content=content)
-        self._chat_page.update_message_display(message)
+        if self._chat_page is not None:
+            self._chat_page.receive_network_message(
+                {
+                    "sender": self.username,
+                    "sender_id": self.connection_manager.client_id,
+                    "content": content,
+                    "message_type": "text",
+                    "metadata": {},
+                }
+            )
 
     def run(self) -> None:
         """Start the application main loop."""
         self._is_running = True
         self.mainloop()
         self._is_running = False
+        self.connection_manager.disconnect_all()
 
 
 def create_main_window(config_manager) -> MainWindow:
