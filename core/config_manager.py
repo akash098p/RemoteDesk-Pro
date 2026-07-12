@@ -39,6 +39,8 @@ _DEFAULTS: Dict[Path, Dict[str, Any]] = {
         "language": "en",
         "first_run": True,
         "app_id": "", # Will be generated on first run if empty
+        "ngrok_token": "",
+        "ngrok_region": "us",
     },
     SETTINGS_FILE: {
         "window": {"width": WINDOW_WIDTH, "height": WINDOW_HEIGHT, "maximized": False},
@@ -50,6 +52,8 @@ _DEFAULTS: Dict[Path, Dict[str, Any]] = {
         "fps_limit": 30,
         "quality": 75,
         "audio_enabled": False,
+        "stream_max_dimension": 1920,
+        "stream_format": "webp",
     },
     USERS_FILE: {
         "recent_connections": [],
