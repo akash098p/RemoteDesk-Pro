@@ -143,6 +143,7 @@ class DashboardPage(ctk.CTkFrame):
                     image=ctk_icon,
                     text=text,
                     compound="left",
+                    command=command,
                     width=150,
                     height=45,
                     corner_radius=12,
@@ -153,6 +154,7 @@ class DashboardPage(ctk.CTkFrame):
                 btn = ctk.CTkButton(
                     buttons_frame,
                     text=text,
+                    command=command,
                     width=150,
                     height=45,
                     corner_radius=12,
@@ -165,14 +167,15 @@ class DashboardPage(ctk.CTkFrame):
 
     def _start_sharing(self):
         """Start screen sharing session"""
-        # Would normally call connection manager to start sharing
         logger.info("Starting screen sharing")
-        # Placeholder – integrate with actual connection manager
+        if getattr(self.master, "_navigation_manager", None):
+            self.master._navigation_manager.show_page("screen")
 
     def _start_remote_control(self):
         """Initiate remote control session"""
         logger.info("Starting remote control")
-        # Would open remote control UI
+        if getattr(self.master, "_navigation_manager", None):
+            self.master._navigation_manager.show_page("screen")
 
     def _open_files(self):
         """Open file transfer page"""
