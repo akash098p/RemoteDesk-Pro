@@ -8,36 +8,23 @@ Connection management page for LAN and optional public sessions.
 
 from __future__ import annotations
 
-import os
 import socket
 import threading
 from typing import Callable, Optional
 
 import customtkinter as ctk
-from PIL import Image
 
 from core.constants import DEFAULT_PORT
 from core.logger import get_logger
 
 logger = get_logger()
 
-ICONS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icons")
-)
-
-
-def load_icon(icon_name: str, size: tuple = (24, 24)) -> Optional[Image.Image]:
-    icon_path = os.path.join(ICONS_DIR, icon_name)
-    if os.path.exists(icon_path):
-        return Image.open(icon_path).resize(size, Image.Resampling.LANCZOS)
-    return None
-
 
 class ConnectionPage(ctk.CTkFrame):
     """Connection page for hosting, scanning, and joining sessions."""
 
     def __init__(self, master, on_connect: Optional[Callable[[str, int], bool]] = None):
-        super().__init__(master)
+        super().__init__(master, fg_color="transparent")
         self.on_connect = on_connect
         self._scan_results: list[str] = []
         self._scanning = False
@@ -55,52 +42,106 @@ class ConnectionPage(ctk.CTkFrame):
         return getattr(self.master, "_connection_manager", None)
 
     def _create_widgets(self) -> None:
-        header = ctk.CTkFrame(self, fg_color=("gray92", "#202020"), corner_radius=12)
-        header.pack(fill="x", padx=20, pady=(12, 10))
+        self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll_frame.pack(fill="both", expand=True, padx=18, pady=(12, 8))
+
+        header = ctk.CTkFrame(self.scroll_frame, fg_color=("gray92", "#202020"), corner_radius=16)
+        header.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
             header,
             text="Connections",
             font=ctk.CTkFont(size=28, weight="bold"),
             text_color=("#111111", "#FFFFFF"),
-        ).pack(anchor="w", padx=18, pady=(14, 4))
+        ).pack(anchor="w", padx=20, pady=(16, 4))
 
         ctk.CTkLabel(
             header,
-            text="Host your device, connect on the same LAN, or create a public entry point for remote access.",
+            text="Host this device, scan your LAN, or connect manually using a local IP or public endpoint.",
             font=ctk.CTkFont(size=13),
             text_color=("#666666", "#BBBBBB"),
-            wraplength=850,
+            wraplength=900,
             justify="left",
-        ).pack(anchor="w", padx=18, pady=(0, 14))
+        ).pack(anchor="w", padx=20, pady=(0, 16))
 
-        host_frame = ctk.CTkFrame(self, fg_color=("gray95", "#1A1A1A"), corner_radius=12)
-        host_frame.pack(fill="x", padx=20, pady=(0, 12))
+        host_frame = ctk.CTkFrame(self.scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=16)
+        host_frame.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
             host_frame,
             text="This Device",
-            font=ctk.CTkFont(size=18, weight="bold"),
-        ).pack(anchor="w", padx=20, pady=(16, 8))
+            font=ctk.CTkFont(size=20, weight="bold"),
+        ).pack(anchor="w", padx=20, pady=(16, 10))
 
-        self.host_ip_label = ctk.CTkLabel(host_frame, text="LAN IP: --", font=ctk.CTkFont(size=13))
-        self.host_ip_label.pack(anchor="w", padx=20, pady=2)
+        info_grid = ctk.CTkFrame(host_frame, fg_color="transparent")
+        info_grid.pack(fill="x", padx=20, pady=(0, 8))
+        info_grid.grid_columnconfigure(0, weight=1)
+        info_grid.grid_columnconfigure(1, weight=1)
+
+        self.host_ip_label = ctk.CTkLabel(info_grid, text="LAN IP: --", font=ctk.CTkFont(size=14), anchor="w")
+        self.host_ip_label.grid(row=0, column=0, sticky="ew", padx=(0, 8), pady=4)
 
         self.host_port_label = ctk.CTkLabel(
-            host_frame,
+            info_grid,
             text=f"Port: {DEFAULT_PORT}",
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=14),
+            anchor="w",
         )
-        self.host_port_label.pack(anchor="w", padx=20, pady=2)
+        self.host_port_label.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=4)
 
         self.public_link_label = ctk.CTkLabel(
             host_frame,
             text="Public Link: Not enabled",
             font=ctk.CTkFont(size=13),
-            wraplength=820,
+            wraplength=900,
             justify="left",
+            anchor="w",
         )
-        self.public_link_label.pack(anchor="w", padx=20, pady=(2, 10))
+        self.public_link_label.pack(fill="x", padx=20, pady=(0, 8))
+
+        self.public_help_label = ctk.CTkLabel(
+            host_frame,
+            text="For internet access, create a public TCP link and share that exact endpoint with the other device.",
+            font=ctk.CTkFont(size=12),
+            text_color=("#666666", "#AAAAAA"),
+            wraplength=900,
+            justify="left",
+            anchor="w",
+        )
+        self.public_help_label.pack(fill="x", padx=20, pady=(0, 12))
+
+        ngrok_row = ctk.CTkFrame(host_frame, fg_color="transparent")
+        ngrok_row.pack(fill="x", padx=20, pady=(0, 10))
+
+        self.ngrok_token_entry = ctk.CTkEntry(
+            ngrok_row,
+            placeholder_text="Ngrok auth token",
+            height=38,
+        )
+        self.ngrok_token_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+        saved_token = ""
+        if self._app is not None:
+            try:
+                saved_token = self._app.config_manager.get_value("config", "ngrok_token", "")
+            except Exception:
+                saved_token = ""
+        if saved_token:
+            self.ngrok_token_entry.insert(0, saved_token)
+
+        self.region_combo = ctk.CTkComboBox(
+            ngrok_row,
+            values=["us", "eu", "ap", "au", "sa", "jp", "in"],
+            width=100,
+            state="readonly",
+        )
+        self.region_combo.set("us")
+        if self._app is not None:
+            try:
+                self.region_combo.set(self._app.config_manager.get_value("config", "ngrok_region", "us"))
+            except Exception:
+                pass
+        self.region_combo.pack(side="left")
 
         host_buttons = ctk.CTkFrame(host_frame, fg_color="transparent")
         host_buttons.pack(fill="x", padx=20, pady=(0, 16))
@@ -108,11 +149,11 @@ class ConnectionPage(ctk.CTkFrame):
         self.refresh_info_btn = ctk.CTkButton(
             host_buttons,
             text="Refresh Info",
-            width=130,
+            width=140,
             height=40,
             command=self._refresh_host_info,
         )
-        self.refresh_info_btn.pack(side="left", padx=(0, 10))
+        self.refresh_info_btn.pack(side="left", padx=(0, 10), pady=4)
 
         self.public_link_btn = ctk.CTkButton(
             host_buttons,
@@ -121,7 +162,7 @@ class ConnectionPage(ctk.CTkFrame):
             height=40,
             command=self._enable_public_link,
         )
-        self.public_link_btn.pack(side="left")
+        self.public_link_btn.pack(side="left", padx=(0, 10), pady=4)
 
         self.disconnect_btn = ctk.CTkButton(
             host_buttons,
@@ -130,75 +171,40 @@ class ConnectionPage(ctk.CTkFrame):
             height=40,
             command=self._disconnect_session,
         )
-        self.disconnect_btn.pack(side="left", padx=(10, 0))
+        self.disconnect_btn.pack(side="left", pady=4)
 
-        list_frame = ctk.CTkFrame(self, fg_color=("gray95", "#1A1A1A"), corner_radius=12)
-        list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 12))
-
-        list_header = ctk.CTkFrame(list_frame, fg_color="transparent")
-        list_header.pack(fill="x", padx=18, pady=(15, 10))
-
-        ctk.CTkLabel(
-            list_header,
-            text="LAN Devices",
-            font=ctk.CTkFont(size=18, weight="bold"),
-        ).pack(side="left")
-
-        self.scan_btn = ctk.CTkButton(
-            list_header,
-            text="Scan Network",
-            width=130,
-            height=38,
-            command=self.scan_network,
-        )
-        self.scan_btn.pack(side="right")
-
-        self.device_scroll = ctk.CTkScrollableFrame(list_frame, fg_color="transparent", height=250)
-        self.device_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 16))
-
-        self.placeholder = ctk.CTkLabel(
-            self.device_scroll,
-            text="No devices found yet. Start the app on another device and scan the local network.",
-            font=ctk.CTkFont(size=13),
-            text_color=("#777777", "#999999"),
-            wraplength=700,
-            justify="left",
-        )
-        self.placeholder.pack(pady=40)
-
-        manual_frame = ctk.CTkFrame(self, fg_color=("gray95", "#1A1A1A"), corner_radius=12)
-        manual_frame.pack(fill="x", padx=20, pady=(0, 12))
+        manual_frame = ctk.CTkFrame(self.scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=16)
+        manual_frame.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
             manual_frame,
             text="Manual Connect",
-            font=ctk.CTkFont(size=18, weight="bold"),
-        ).pack(anchor="w", padx=20, pady=(15, 6))
+            font=ctk.CTkFont(size=20, weight="bold"),
+        ).pack(anchor="w", padx=20, pady=(16, 6))
 
         ctk.CTkLabel(
             manual_frame,
-            text="Use the host device LAN IP for same-network sessions, or use the public TCP endpoint for internet sessions.",
+            text="Use a LAN IP like 192.168.x.x for same-network sessions, or paste a public endpoint like tcp://0.tcp.in.ngrok.io:12345 for internet sessions.",
             font=ctk.CTkFont(size=12),
             text_color=("#666666", "#AAAAAA"),
-            wraplength=820,
+            wraplength=900,
             justify="left",
         ).pack(anchor="w", padx=20, pady=(0, 12))
 
         input_row = ctk.CTkFrame(manual_frame, fg_color="transparent")
-        input_row.pack(fill="x", padx=20, pady=(0, 14))
+        input_row.pack(fill="x", padx=20, pady=(0, 16))
 
         self.ip_entry = ctk.CTkEntry(
             input_row,
-            placeholder_text="Host or IP (example: 192.168.1.25)",
-            width=320,
+            placeholder_text="Host, IP, or public endpoint",
             height=42,
         )
-        self.ip_entry.pack(side="left", padx=(0, 10))
+        self.ip_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
         self.port_entry = ctk.CTkEntry(
             input_row,
             placeholder_text=f"Port ({DEFAULT_PORT})",
-            width=140,
+            width=150,
             height=42,
         )
         self.port_entry.pack(side="left", padx=(0, 10))
@@ -212,13 +218,47 @@ class ConnectionPage(ctk.CTkFrame):
         )
         self.connect_btn.pack(side="left")
 
+        list_frame = ctk.CTkFrame(self.scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=16)
+        list_frame.pack(fill="x", pady=(0, 8))
+
+        list_header = ctk.CTkFrame(list_frame, fg_color="transparent")
+        list_header.pack(fill="x", padx=18, pady=(15, 10))
+
+        ctk.CTkLabel(
+            list_header,
+            text="LAN Devices",
+            font=ctk.CTkFont(size=20, weight="bold"),
+        ).pack(side="left")
+
+        self.scan_btn = ctk.CTkButton(
+            list_header,
+            text="Scan Network",
+            width=130,
+            height=38,
+            command=self.scan_network,
+        )
+        self.scan_btn.pack(side="right")
+
+        self.device_scroll = ctk.CTkScrollableFrame(list_frame, fg_color="transparent", height=260)
+        self.device_scroll.pack(fill="x", padx=16, pady=(0, 16))
+
+        self.placeholder = ctk.CTkLabel(
+            self.device_scroll,
+            text="No devices found yet. Start the app on another device and scan the local network.",
+            font=ctk.CTkFont(size=13),
+            text_color=("#777777", "#999999"),
+            wraplength=760,
+            justify="left",
+        )
+        self.placeholder.pack(pady=40)
+
         self.status_var = ctk.StringVar(value="Ready")
         ctk.CTkLabel(
             self,
             textvariable=self.status_var,
             font=ctk.CTkFont(size=12),
             text_color=("#666666", "#AAAAAA"),
-        ).pack(anchor="w", padx=24, pady=(0, 8))
+        ).pack(anchor="w", padx=24, pady=(0, 10))
 
     def _refresh_host_info(self) -> None:
         manager = self._connection_manager
@@ -247,17 +287,19 @@ class ConnectionPage(ctk.CTkFrame):
             return
 
         self.status_var.set("Creating public link...")
-        token = None
+        token = self.ngrok_token_entry.get().strip() or None
+        region = self.region_combo.get().strip() or "us"
         if self._app is not None:
             try:
-                token = self._app.config_manager.get_value("config", "ngrok_token", None)
+                self._app.config_manager.set_value("config", "ngrok_token", token or "")
+                self._app.config_manager.set_value("config", "ngrok_region", region)
             except Exception:
-                token = None
+                pass
 
-        public_url = manager.enable_public_tunnel(auth_token=token)
+        public_url = manager.enable_public_tunnel(auth_token=token, region=region)
         if public_url:
             self.public_link_label.configure(text=f"Public Link: {public_url}")
-            self.status_var.set("Public link ready. Share the host and port from that endpoint.")
+            self.status_var.set("Public link ready. Share that exact TCP endpoint with the other device.")
         else:
             self.status_var.set("Public link unavailable. Install pyngrok and configure an ngrok token if needed.")
 
@@ -338,14 +380,14 @@ class ConnectionPage(ctk.CTkFrame):
                 text=f"No hosts found on port {DEFAULT_PORT}. Make sure the other device is running RemoteDesk Pro.",
                 font=ctk.CTkFont(size=13),
                 text_color=("#777777", "#999999"),
-                wraplength=700,
+                wraplength=760,
                 justify="left",
             )
             self.placeholder.pack(pady=40)
             return
 
         for device_ip in devices:
-            card = ctk.CTkFrame(self.device_scroll, fg_color=("white", "#232323"), corner_radius=10)
+            card = ctk.CTkFrame(self.device_scroll, fg_color=("white", "#232323"), corner_radius=12)
             card.pack(fill="x", padx=4, pady=6)
 
             details = ctk.CTkFrame(card, fg_color="transparent")
