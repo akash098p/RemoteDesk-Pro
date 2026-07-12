@@ -9,11 +9,7 @@ import threading
 import time
 import queue
 import logging
-import base64
-import json
-from typing import Optional, Callable, Any
-
-import pyaudio
+from typing import Optional, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +43,8 @@ class AudioCapture:
         self._capture_thread = None
         self._audio = None
         self._stream = None
+        self._backend = None
+        self._sounddevice_capture = None
         
         # Audio queue for buffering
         self._audio_queue = queue.Queue(maxsize=50)
@@ -58,6 +56,9 @@ class AudioCapture:
             return True
         
         try:
+            import pyaudio
+
+            self._backend = "pyaudio"
             self._audio = pyaudio.PyAudio()
             
             # Find default input device
@@ -88,12 +89,39 @@ class AudioCapture:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to start audio capture: {e}")
+            logger.warning(f"PyAudio backend unavailable: {e}")
+
+        try:
+            from audio.sounddevice_capture import create_sounddevice_capture
+
+            self._backend = "sounddevice"
+            self._sounddevice_capture = create_sounddevice_capture(
+                rate=self.rate,
+                chunk=self.chunk,
+                channels=self.channels,
+                on_audio_data=self.on_audio_data,
+            )
+            started = self._sounddevice_capture.start()
+            self._running = started
+            if started:
+                logger.info(f"SoundDevice audio capture started (rate={self.rate}, chunk={self.chunk})")
+            return started
+        except Exception as e:
+            logger.error(f"Failed to start any audio capture backend: {e}")
             return False
     
     def stop(self) -> None:
         """Stop audio capture"""
         self._running = False
+
+        if self._backend == "sounddevice" and self._sounddevice_capture is not None:
+            try:
+                self._sounddevice_capture.stop()
+            except Exception:
+                pass
+            self._sounddevice_capture = None
+            logger.info("Audio capture stopped")
+            return
         
         if self._stream:
             try:
@@ -112,6 +140,8 @@ class AudioCapture:
     
     def _capture_loop(self) -> None:
         """Main audio capture loop"""
+        if self._backend != "pyaudio" or self._stream is None:
+            return
         while self._running:
             try:
                 data = self._stream.read(self.chunk, exception_on_overflow=False)
@@ -142,6 +172,8 @@ class AudioCapture:
     
     def get_audio_chunk(self, timeout: float = 0.1) -> Optional[bytes]:
         """Get audio chunk from queue"""
+        if self._backend == "sounddevice" and self._sounddevice_capture is not None:
+            return self._sounddevice_capture.get_audio_chunk(timeout=timeout)
         try:
             return self._audio_queue.get(timeout=timeout)
         except queue.Empty:
