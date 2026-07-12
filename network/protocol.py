@@ -20,6 +20,7 @@ class MessageType(Enum):
     CONTROL_REQUEST = 4   # Permission request from remote client
     HEARTBEAT = 5         # Heartbeat message for connection checking
     AUDIO_FRAME = 6       # Audio frame for real-time audio streaming
+    CHAT_MESSAGE = 7      # Text chat between peers
 
 @dataclass
 class RemoteDeskMessage:
