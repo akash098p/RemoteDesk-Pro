@@ -11,9 +11,7 @@ from __future__ import annotations
 import customtkinter as ctk
 import socket
 import threading
-import time
 import os
-from datetime import datetime
 from typing import Optional, Callable
 from PIL import Image
 
@@ -40,9 +38,11 @@ class ConnectionPage(ctk.CTkFrame):
         self._connections = []
         self._scan_results = []
         self._scanning = False
+        self._scan_thread: Optional[threading.Thread] = None
 
         self._create_widgets()
-        self.refresh_connections()
+        # Delay the first scan until Tk is fully inside the main loop.
+        self.after(250, self.refresh_connections)
 
     def _create_widgets(self):
         """Create the connection page UI with glassmorphism styling."""
@@ -213,7 +213,7 @@ class ConnectionPage(ctk.CTkFrame):
 
     def scan_network(self):
         """Scan local network for devices running RemoteDesk Pro."""
-        if self._scanning:
+        if self._scanning or not self.winfo_exists():
             return
 
         self._scanning = True
@@ -233,7 +233,18 @@ class ConnectionPage(ctk.CTkFrame):
         self.placeholder.pack(pady=50)
 
         # Run scan in background thread
-        threading.Thread(target=self._scan_network_thread, daemon=True).start()
+        self._scan_thread = threading.Thread(target=self._scan_network_thread, daemon=True)
+        self._scan_thread.start()
+
+    def _queue_ui_update(self, callback: Callable[[], None]) -> None:
+        """Safely schedule a UI update from a worker thread."""
+        if not self.winfo_exists():
+            return
+        try:
+            self.after(0, callback)
+        except RuntimeError:
+            # Tk is shutting down or mainloop has not fully started yet.
+            pass
 
     def _scan_network_thread(self):
         """Background thread for network scanning."""
@@ -271,10 +282,10 @@ class ConnectionPage(ctk.CTkFrame):
                 t.join()
 
             # Update UI on main thread
-            self.after(0, lambda: self._update_device_list(found_devices))
+            self._queue_ui_update(lambda: self._update_device_list(found_devices))
 
         except Exception as e:
-            self.after(0, lambda: self._scan_error(str(e)))
+            self._queue_ui_update(lambda: self._scan_error(str(e)))
 
     def _update_device_list(self, devices):
         """Update the device list with scan results."""
