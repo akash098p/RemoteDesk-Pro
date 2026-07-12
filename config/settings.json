@@ -4,5 +4,6 @@
     "remember_window_size": true,
     "start_maximized": false,
     "sidebar_collapsed": false,
-    "font_size": 14
+    "font_size": 15,
+    "quality": 80
 }
