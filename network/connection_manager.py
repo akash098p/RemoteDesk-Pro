@@ -16,6 +16,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
+from urllib.parse import urlparse
 
 from core.constants import DEFAULT_PORT
 from core.logger import get_logger
@@ -34,6 +35,8 @@ class PeerSession:
     socket: socket.socket
     address: tuple[str, int]
     device_name: str = "Remote Device"
+    remote_client_id: Optional[str] = None
+    last_seen: float = field(default_factory=time.time)
     connected_at: float = field(default_factory=time.time)
 
 
@@ -63,6 +66,7 @@ class ConnectionManager:
         self._is_client = False
         self._remote_control_enabled = False
         self._lock = threading.RLock()
+        self._send_lock = threading.RLock()
 
         self._callbacks: Dict[str, Optional[Callable[..., None]]] = {
             "status": None,
@@ -78,6 +82,24 @@ class ConnectionManager:
         self._keyboard_controller = None
         self._ngrok: Optional[NgrokIntegration] = None
         logger.info(f"ConnectionManager initialized on port {server_port}")
+
+    def parse_connection_target(self, host: str, port: Optional[int] = None) -> tuple[str, int]:
+        """Accept raw hosts, host:port values, or ngrok-style tcp URLs."""
+        raw_host = host.strip()
+        raw_port = port
+
+        if "://" in raw_host:
+            parsed = urlparse(raw_host)
+            if parsed.hostname:
+                raw_host = parsed.hostname
+            if parsed.port:
+                raw_port = parsed.port
+        elif raw_host.count(":") == 1 and raw_host.rsplit(":", 1)[1].isdigit():
+            host_part, port_part = raw_host.rsplit(":", 1)
+            raw_host = host_part
+            raw_port = int(port_part)
+
+        return raw_host, int(raw_port or DEFAULT_PORT)
 
     def register_callback(self, event: str, callback: Callable[..., None]) -> None:
         """Register a callback for connection/session events."""
@@ -146,6 +168,10 @@ class ConnectionManager:
     def connect_to_host(self, host: str, port: int = DEFAULT_PORT) -> bool:
         """Connect to a remote host over TCP."""
         try:
+            host, port = self.parse_connection_target(host, port)
+            if self._client_socket is not None:
+                self.disconnect_active_session()
+
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.settimeout(10)
             client_socket.connect((host, port))
@@ -293,6 +319,7 @@ class ConnectionManager:
             self._server_socket = None
             self._is_client = False
             self._is_server = False
+            self._remote_control_enabled = False
 
         for peer in peers:
             self._close_socket(peer.socket)
@@ -313,6 +340,7 @@ class ConnectionManager:
             self._client_socket = None
             self._client_peer = None
             self._is_client = False
+            self._remote_control_enabled = False
             if client_socket is not None:
                 self._close_socket(client_socket)
             if peer is not None:
@@ -323,6 +351,7 @@ class ConnectionManager:
         with self._lock:
             peers = list(self._peers.values())
             self._peers.clear()
+            self._remote_control_enabled = False
 
         for peer in peers:
             self._close_socket(peer.socket)
@@ -355,13 +384,60 @@ class ConnectionManager:
                 sent = self._send_packet(peer.socket, packet) or sent
         return sent
 
+    def respond_to_control_request(self, peer_id: str, granted: bool, requested_by: str = "remote") -> bool:
+        """Reply to a pending remote-control request."""
+        with self._lock:
+            peer = self._peers.get(peer_id)
+        if peer is None:
+            return False
+
+        action = "granted" if granted else "denied"
+        response = RemoteDeskMessage(
+            MessageType.CONTROL_REQUEST,
+            {
+                "action": action,
+                "requested_by": requested_by,
+                "timestamp": time.time(),
+            },
+        )
+        if granted:
+            self.set_remote_control_enabled(True)
+        return self._send_packet(peer.socket, PacketSystem.create_packet(response.to_dict()))
+
     def _send_packet(self, sock: socket.socket, packet: bytes) -> bool:
         try:
-            sock.sendall(packet)
+            with self._send_lock:
+                sock.sendall(packet)
             return True
         except Exception as exc:
             logger.error(f"Send failed: {exc}")
+            self._drop_socket(sock)
             return False
+
+    def _drop_socket(self, sock: socket.socket) -> None:
+        """Remove a socket from active tracking after transport failure."""
+        self._close_socket(sock)
+        with self._lock:
+            if self._client_socket is sock:
+                self._client_socket = None
+                self._client_peer = None
+                self._is_client = False
+                self._remote_control_enabled = False
+                self._emit("status", self.get_connection_status().title(), self.has_active_session())
+                return
+
+            removed_peer_id = None
+            removed_peer = None
+            for peer_id, peer in self._peers.items():
+                if peer.socket is sock:
+                    removed_peer_id = peer_id
+                    removed_peer = peer
+                    break
+            if removed_peer_id is not None:
+                self._peers.pop(removed_peer_id, None)
+                if removed_peer is not None:
+                    self._emit("peer_disconnected", removed_peer)
+                self._emit("status", self.get_connection_status().title(), self.has_active_session())
 
     def _accept_loop(self) -> None:
         while self._running and self._server_socket is not None:
@@ -429,6 +505,7 @@ class ConnectionManager:
 
     def _process_message(self, message: RemoteDeskMessage, peer_id: str, is_server_side: bool) -> None:
         if message.type == MessageType.HEARTBEAT:
+            self._handle_heartbeat(message.payload, peer_id, is_server_side)
             return
         if message.type == MessageType.SCREEN_FRAME:
             self._emit("screen_frame", message.payload)
@@ -524,21 +601,31 @@ class ConnectionManager:
     def _handle_control_request(self, payload: dict, peer_id: str, is_server_side: bool) -> None:
         if payload.get("action") == "request":
             self._emit("control_request", payload, peer_id)
-            self.set_remote_control_enabled(True)
-            if is_server_side:
-                response = RemoteDeskMessage(
-                    MessageType.CONTROL_REQUEST,
-                    {
-                        "action": "granted",
-                        "requested_by": payload.get("requested_by", "remote"),
-                        "timestamp": time.time(),
-                    },
-                )
-                peer = self._peers.get(peer_id)
-                if peer is not None:
-                    self._send_packet(peer.socket, PacketSystem.create_packet(response.to_dict()))
+            if not is_server_side:
+                self.set_remote_control_enabled(True)
         elif payload.get("action") == "granted":
+            self.set_remote_control_enabled(True)
             self._emit("status", "Remote control granted", True)
+        elif payload.get("action") == "denied":
+            self.set_remote_control_enabled(False)
+            self._emit("status", "Remote control denied", False)
+
+    def _handle_heartbeat(self, payload: dict, peer_id: str, is_server_side: bool) -> None:
+        """Update peer metadata from hello/heartbeat messages."""
+        with self._lock:
+            if is_server_side:
+                peer = self._peers.get(peer_id)
+            else:
+                peer = self._client_peer
+
+            if peer is None:
+                return
+
+            peer.last_seen = time.time()
+            peer.device_name = payload.get("device_name", peer.device_name)
+            peer.remote_client_id = payload.get("client_id", peer.remote_client_id)
+
+        self._emit("status", self.get_session_summary(), True)
 
     def _ensure_mouse_controller(self):
         if self._mouse_controller is not None:
