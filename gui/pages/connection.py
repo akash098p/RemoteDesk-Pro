@@ -2,25 +2,31 @@
 =================================================================================
 RemoteDesk Pro
 File: gui/pages/connection.py
-Connection management page with premium glassmorphism UI
+Connection management page for LAN and optional public sessions.
 =================================================================================
 """
 
 from __future__ import annotations
 
-import customtkinter as ctk
+import os
 import socket
 import threading
-import os
-from typing import Optional, Callable
+from typing import Callable, Optional
+
+import customtkinter as ctk
 from PIL import Image
 
-# Icon helper
+from core.constants import DEFAULT_PORT
+from core.logger import get_logger
+
+logger = get_logger()
+
 ICONS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'icons')
+    os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icons")
 )
 
-def load_icon(icon_name: str, size: tuple = (24, 24)) -> Image.Image:
+
+def load_icon(icon_name: str, size: tuple = (24, 24)) -> Optional[Image.Image]:
     icon_path = os.path.join(ICONS_DIR, icon_name)
     if os.path.exists(icon_path):
         return Image.open(icon_path).resize(size, Image.Resampling.LANCZOS)
@@ -28,366 +34,374 @@ def load_icon(icon_name: str, size: tuple = (24, 24)) -> Image.Image:
 
 
 class ConnectionPage(ctk.CTkFrame):
-    """
-    Modern connection management page with premium glassmorphism UI.
-    """
+    """Connection page for hosting, scanning, and joining sessions."""
 
-    def __init__(self, master, on_connect: Optional[Callable] = None):
+    def __init__(self, master, on_connect: Optional[Callable[[str, int], bool]] = None):
         super().__init__(master)
         self.on_connect = on_connect
-        self._connections = []
-        self._scan_results = []
+        self._scan_results: list[str] = []
         self._scanning = False
         self._scan_thread: Optional[threading.Thread] = None
-
         self._create_widgets()
-        # Delay the first scan until Tk is fully inside the main loop.
-        self.after(250, self.refresh_connections)
+        self.after(200, self._refresh_host_info)
+        self.after(350, self.refresh_connections)
 
-    def _create_widgets(self):
-        """Create the connection page UI with glassmorphism styling."""
-        # Header section
-        header_frame = ctk.CTkFrame(
-            self,
-            fg_color=("#1E1E1E", "#252525"),
-            corner_radius=8,
-            border_width=1,
-            border_color=("#333333", "#555555")
-        )
-        header_frame.pack(fill="x", padx=20, pady=(0, 10))
+    @property
+    def _app(self):
+        return getattr(self.master, "_app", None)
 
-        title_label = ctk.CTkLabel(
-            header_frame,
-            text="Network Connections",
+    @property
+    def _connection_manager(self):
+        return getattr(self.master, "_connection_manager", None)
+
+    def _create_widgets(self) -> None:
+        header = ctk.CTkFrame(self, fg_color=("gray92", "#202020"), corner_radius=12)
+        header.pack(fill="x", padx=20, pady=(12, 10))
+
+        ctk.CTkLabel(
+            header,
+            text="Connections",
             font=ctk.CTkFont(size=28, weight="bold"),
-            text_color=("#FFFFFF", "#FFFFFF")
-        )
-        title_label.pack(anchor="w")
+            text_color=("#111111", "#FFFFFF"),
+        ).pack(anchor="w", padx=18, pady=(14, 4))
 
-        subtitle_label = ctk.CTkLabel(
-            header_frame,
-            text="Manage and connect to remote devices securely",
-            font=ctk.CTkFont(size=14),
-            text_color=("#CCCCCC", "#AAAAAA")
-        )
-        subtitle_label.pack(anchor="w", pady=(5, 0))
+        ctk.CTkLabel(
+            header,
+            text="Host your device, connect on the same LAN, or create a public entry point for remote access.",
+            font=ctk.CTkFont(size=13),
+            text_color=("#666666", "#BBBBBB"),
+            wraplength=850,
+            justify="left",
+        ).pack(anchor="w", padx=18, pady=(0, 14))
 
-        # Device list section
-        list_frame = ctk.CTkFrame(
-            self,
-            fg_color=("#1A1A1A", "#2A2A2A"),
-            corner_radius=12,
-            border_width=1,
-            border_color=("#333333", "#555555")
-        )
-        list_frame.pack(fill="both", expand=True, padx=30, pady=(0, 20))
+        host_frame = ctk.CTkFrame(self, fg_color=("gray95", "#1A1A1A"), corner_radius=12)
+        host_frame.pack(fill="x", padx=20, pady=(0, 12))
 
-        # Section header
+        ctk.CTkLabel(
+            host_frame,
+            text="This Device",
+            font=ctk.CTkFont(size=18, weight="bold"),
+        ).pack(anchor="w", padx=20, pady=(16, 8))
+
+        self.host_ip_label = ctk.CTkLabel(host_frame, text="LAN IP: --", font=ctk.CTkFont(size=13))
+        self.host_ip_label.pack(anchor="w", padx=20, pady=2)
+
+        self.host_port_label = ctk.CTkLabel(
+            host_frame,
+            text=f"Port: {DEFAULT_PORT}",
+            font=ctk.CTkFont(size=13),
+        )
+        self.host_port_label.pack(anchor="w", padx=20, pady=2)
+
+        self.public_link_label = ctk.CTkLabel(
+            host_frame,
+            text="Public Link: Not enabled",
+            font=ctk.CTkFont(size=13),
+            wraplength=820,
+            justify="left",
+        )
+        self.public_link_label.pack(anchor="w", padx=20, pady=(2, 10))
+
+        host_buttons = ctk.CTkFrame(host_frame, fg_color="transparent")
+        host_buttons.pack(fill="x", padx=20, pady=(0, 16))
+
+        self.refresh_info_btn = ctk.CTkButton(
+            host_buttons,
+            text="Refresh Info",
+            width=130,
+            height=40,
+            command=self._refresh_host_info,
+        )
+        self.refresh_info_btn.pack(side="left", padx=(0, 10))
+
+        self.public_link_btn = ctk.CTkButton(
+            host_buttons,
+            text="Create Public Link",
+            width=170,
+            height=40,
+            command=self._enable_public_link,
+        )
+        self.public_link_btn.pack(side="left")
+
+        self.disconnect_btn = ctk.CTkButton(
+            host_buttons,
+            text="Disconnect Session",
+            width=170,
+            height=40,
+            command=self._disconnect_session,
+        )
+        self.disconnect_btn.pack(side="left", padx=(10, 0))
+
+        list_frame = ctk.CTkFrame(self, fg_color=("gray95", "#1A1A1A"), corner_radius=12)
+        list_frame.pack(fill="both", expand=True, padx=20, pady=(0, 12))
+
         list_header = ctk.CTkFrame(list_frame, fg_color="transparent")
-        list_header.pack(fill="x", padx=20, pady=15)
+        list_header.pack(fill="x", padx=18, pady=(15, 10))
 
         ctk.CTkLabel(
             list_header,
-            text="Available Devices",
+            text="LAN Devices",
             font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=("#FFFFFF", "#FFFFFF")
         ).pack(side="left")
 
-        # Scan button - icon only
-        controls_frame = ctk.CTkFrame(list_header, fg_color="transparent")
-        controls_frame.pack(side="right")
-
-        scan_icon = load_icon("search.png", size=(20, 20))
-        if scan_icon:
-            scan_img = ctk.CTkImage(light_image=scan_icon, dark_image=scan_icon, size=(20, 20))
-            self.scan_btn = ctk.CTkButton(
-                controls_frame,
-                image=scan_img,
-                text="",
-                command=self.scan_network,
-                width=44,
-                height=44,
-                corner_radius=22,
-                fg_color=("#0084FF", "#0084FF"),
-                hover_color=("#0073E6", "#0073E6")
-            )
-        else:
-            self.scan_btn = ctk.CTkButton(
-                controls_frame,
-                text="🔍",
-                command=self.scan_network,
-                width=44,
-                height=44,
-                corner_radius=22,
-                fg_color=("#0084FF", "#0084FF"),
-                hover_color=("#0073E6", "#0073E6")
-            )
-        self.scan_btn.pack(side="left", padx=5)
-
-        # Device list
-        self.device_scroll = ctk.CTkScrollableFrame(
-            list_frame,
-            fg_color="transparent",
-            height=300
+        self.scan_btn = ctk.CTkButton(
+            list_header,
+            text="Scan Network",
+            width=130,
+            height=38,
+            command=self.scan_network,
         )
-        self.device_scroll.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.scan_btn.pack(side="right")
 
-        # Placeholder text
+        self.device_scroll = ctk.CTkScrollableFrame(list_frame, fg_color="transparent", height=250)
+        self.device_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+
         self.placeholder = ctk.CTkLabel(
             self.device_scroll,
-            text="No devices found. Click the search button to scan your network.",
-            font=ctk.CTkFont(size=14),
-            text_color=("#888888", "#888888")
+            text="No devices found yet. Start the app on another device and scan the local network.",
+            font=ctk.CTkFont(size=13),
+            text_color=("#777777", "#999999"),
+            wraplength=700,
+            justify="left",
         )
-        self.placeholder.pack(pady=50)
+        self.placeholder.pack(pady=40)
 
-        # Manual connection section
-        manual_frame = ctk.CTkFrame(
-            self,
-            fg_color=("#1A1A1A", "#2A2A2A"),
-            corner_radius=12,
-            border_width=1,
-            border_color=("#333333", "#555555")
-        )
-        manual_frame.pack(fill="x", padx=30, pady=(0, 20))
+        manual_frame = ctk.CTkFrame(self, fg_color=("gray95", "#1A1A1A"), corner_radius=12)
+        manual_frame.pack(fill="x", padx=20, pady=(0, 12))
 
         ctk.CTkLabel(
             manual_frame,
-            text="Manual Connection",
+            text="Manual Connect",
             font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=("#FFFFFF", "#FFFFFF")
-        ).pack(anchor="w", padx=20, pady=(15, 5))
+        ).pack(anchor="w", padx=20, pady=(15, 6))
 
         ctk.CTkLabel(
             manual_frame,
-            text="Enter IP address to connect directly to a device",
+            text="Use the host device LAN IP for same-network sessions, or use the public TCP endpoint for internet sessions.",
             font=ctk.CTkFont(size=12),
-            text_color=("#AAAAAA", "#888888")
-        ).pack(anchor="w", padx=20, pady=(0, 15))
+            text_color=("#666666", "#AAAAAA"),
+            wraplength=820,
+            justify="left",
+        ).pack(anchor="w", padx=20, pady=(0, 12))
 
-        input_frame = ctk.CTkFrame(manual_frame, fg_color="transparent")
-        input_frame.pack(fill="x", padx=20, pady=(0, 15))
+        input_row = ctk.CTkFrame(manual_frame, fg_color="transparent")
+        input_row.pack(fill="x", padx=20, pady=(0, 14))
 
         self.ip_entry = ctk.CTkEntry(
-            input_frame,
-            placeholder_text="IP Address (e.g., 192.168.1.100)",
-            font=ctk.CTkFont(size=14),
-            height=44,
-            corner_radius=10,
-            width=300
+            input_row,
+            placeholder_text="Host or IP (example: 192.168.1.25)",
+            width=320,
+            height=42,
         )
         self.ip_entry.pack(side="left", padx=(0, 10))
 
         self.port_entry = ctk.CTkEntry(
-            input_frame,
-            placeholder_text="Port (default: 5555)",
-            font=ctk.CTkFont(size=14),
-            height=44,
-            corner_radius=10,
-            width=120
+            input_row,
+            placeholder_text=f"Port ({DEFAULT_PORT})",
+            width=140,
+            height=42,
         )
         self.port_entry.pack(side="left", padx=(0, 10))
 
-        connect_btn = ctk.CTkButton(
-            input_frame,
+        self.connect_btn = ctk.CTkButton(
+            input_row,
             text="Connect",
-            command=self._manual_connect,
             width=140,
-            height=44,
-            corner_radius=10,
-            fg_color=("#0084FF", "#0084FF"),
-            hover_color=("#0073E6", "#0073E6")
+            height=42,
+            command=self._manual_connect,
         )
-        connect_btn.pack(side="left")
+        self.connect_btn.pack(side="left")
 
-        # Status bar
         self.status_var = ctk.StringVar(value="Ready")
-        status_bar = ctk.CTkFrame(self, fg_color="transparent", height=30)
-        status_bar.pack(fill="x", padx=30, pady=(0, 10))
         ctk.CTkLabel(
-            status_bar,
+            self,
             textvariable=self.status_var,
             font=ctk.CTkFont(size=12),
-            text_color=("#AAAAAA", "#888888")
-        ).pack(side="left")
+            text_color=("#666666", "#AAAAAA"),
+        ).pack(anchor="w", padx=24, pady=(0, 8))
 
-    def scan_network(self):
-        """Scan local network for devices running RemoteDesk Pro."""
-        if self._scanning or not self.winfo_exists():
+    def _refresh_host_info(self) -> None:
+        manager = self._connection_manager
+        if manager is None:
+            return
+        self.host_ip_label.configure(text=f"LAN IP: {manager.get_local_ip()}")
+        self.host_port_label.configure(text=f"Port: {manager.server_port}")
+        public_endpoint = manager.get_public_endpoint()
+        if public_endpoint:
+            self.public_link_label.configure(text=f"Public Link: {public_endpoint}")
+        else:
+            self.public_link_label.configure(text="Public Link: Not enabled")
+        self.status_var.set(manager.get_session_summary())
+
+    def _disconnect_session(self) -> None:
+        manager = self._connection_manager
+        if manager is None:
+            return
+        manager.disconnect_active_session()
+        self.status_var.set("Session disconnected.")
+        self._refresh_host_info()
+
+    def _enable_public_link(self) -> None:
+        manager = self._connection_manager
+        if manager is None:
+            return
+
+        self.status_var.set("Creating public link...")
+        token = None
+        if self._app is not None:
+            try:
+                token = self._app.config_manager.get_value("config", "ngrok_token", None)
+            except Exception:
+                token = None
+
+        public_url = manager.enable_public_tunnel(auth_token=token)
+        if public_url:
+            self.public_link_label.configure(text=f"Public Link: {public_url}")
+            self.status_var.set("Public link ready. Share the host and port from that endpoint.")
+        else:
+            self.status_var.set("Public link unavailable. Install pyngrok and configure an ngrok token if needed.")
+
+    def scan_network(self) -> None:
+        """Scan local network for hosts listening on the RemoteDesk port."""
+        if self._scanning:
             return
 
         self._scanning = True
         self.scan_btn.configure(state="disabled", text="Scanning...")
-        self.status_var.set("Scanning network...")
+        self.status_var.set("Scanning local network...")
 
-        # Clear previous results
         for widget in self.device_scroll.winfo_children():
             widget.destroy()
 
         self.placeholder = ctk.CTkLabel(
             self.device_scroll,
-            text="Scanning network...",
-            font=ctk.CTkFont(size=14),
-            text_color=("#888888", "#888888")
+            text="Scanning for available RemoteDesk hosts...",
+            font=ctk.CTkFont(size=13),
+            text_color=("#777777", "#999999"),
         )
-        self.placeholder.pack(pady=50)
+        self.placeholder.pack(pady=40)
 
-        # Run scan in background thread
         self._scan_thread = threading.Thread(target=self._scan_network_thread, daemon=True)
         self._scan_thread.start()
 
-    def _queue_ui_update(self, callback: Callable[[], None]) -> None:
-        """Safely schedule a UI update from a worker thread."""
-        if not self.winfo_exists():
-            return
+    def _scan_network_thread(self) -> None:
         try:
-            self.after(0, callback)
-        except RuntimeError:
-            # Tk is shutting down or mainloop has not fully started yet.
-            pass
+            probe_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            probe_socket.connect(("8.8.8.8", 80))
+            local_ip = probe_socket.getsockname()[0]
+            probe_socket.close()
 
-    def _scan_network_thread(self):
-        """Background thread for network scanning."""
-        try:
-            # Get local IP
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-            s.close()
-
-            # Scan local subnet
             base_ip = ".".join(local_ip.split(".")[:3])
-            found_devices = []
+            found_devices: list[str] = []
+            found_lock = threading.Lock()
 
-            def check_ip(ip):
+            def check_ip(ip: str) -> None:
                 try:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    sock.settimeout(0.2)
-                    result = sock.connect_ex((ip, 5555))
+                    sock.settimeout(0.15)
+                    result = sock.connect_ex((ip, DEFAULT_PORT))
                     sock.close()
                     if result == 0:
-                        found_devices.append(ip)
+                        with found_lock:
+                            found_devices.append(ip)
                 except Exception:
                     pass
 
-            threads = []
+            workers = []
             for i in range(1, 255):
                 ip = f"{base_ip}.{i}"
-                if ip != local_ip:
-                    t = threading.Thread(target=check_ip, args=(ip,))
-                    threads.append(t)
-                    t.start()
+                if ip == local_ip:
+                    continue
+                worker = threading.Thread(target=check_ip, args=(ip,), daemon=True)
+                workers.append(worker)
+                worker.start()
 
-            for t in threads:
-                t.join()
+            for worker in workers:
+                worker.join()
 
-            # Update UI on main thread
-            self._queue_ui_update(lambda: self._update_device_list(found_devices))
+            self.after(0, lambda: self._update_device_list(sorted(found_devices)))
+        except Exception as exc:
+            self.after(0, lambda: self._scan_error(str(exc)))
 
-        except Exception as e:
-            self._queue_ui_update(lambda: self._scan_error(str(e)))
-
-    def _update_device_list(self, devices):
-        """Update the device list with scan results."""
+    def _update_device_list(self, devices: list[str]) -> None:
         for widget in self.device_scroll.winfo_children():
             widget.destroy()
 
         self._scan_results = devices
         self._scanning = False
         self.scan_btn.configure(state="normal", text="Scan Network")
-        self.status_var.set(f"Scan complete. Found {len(devices)} device(s).")
+        self.status_var.set(f"Scan complete. Found {len(devices)} host(s).")
 
         if not devices:
             self.placeholder = ctk.CTkLabel(
                 self.device_scroll,
-                text="No devices found on network. Ensure devices are running RemoteDesk Pro.",
-                font=ctk.CTkFont(size=14),
-                text_color=("#888888", "#888888")
+                text=f"No hosts found on port {DEFAULT_PORT}. Make sure the other device is running RemoteDesk Pro.",
+                font=ctk.CTkFont(size=13),
+                text_color=("#777777", "#999999"),
+                wraplength=700,
+                justify="left",
             )
-            self.placeholder.pack(pady=50)
+            self.placeholder.pack(pady=40)
             return
 
         for device_ip in devices:
-            card = ctk.CTkFrame(
-                self.device_scroll,
-                fg_color=("#1E1E1E", "#2A2A2A"),
-                corner_radius=10,
-                border_width=1,
-                border_color=("#333333", "#555555")
-            )
-            card.pack(fill="x", pady=8, padx=10)
+            card = ctk.CTkFrame(self.device_scroll, fg_color=("white", "#232323"), corner_radius=10)
+            card.pack(fill="x", padx=4, pady=6)
 
-            # Device info
-            info_frame = ctk.CTkFrame(card, fg_color="transparent")
-            info_frame.pack(fill="x", padx=15, pady=12)
-
-            ctk.CTkLabel(
-                info_frame,
-                text="🖥️",
-                font=ctk.CTkFont(size=24)
-            ).pack(side="left", padx=(0, 15))
-
-            details = ctk.CTkFrame(info_frame, fg_color="transparent")
-            details.pack(side="left", fill="x", expand=True)
+            details = ctk.CTkFrame(card, fg_color="transparent")
+            details.pack(side="left", fill="x", expand=True, padx=15, pady=12)
 
             ctk.CTkLabel(
                 details,
-                text="RemoteDesk Pro Device",
+                text="RemoteDesk Pro Host",
                 font=ctk.CTkFont(size=14, weight="bold"),
-                text_color=("#FFFFFF", "#FFFFFF")
             ).pack(anchor="w")
 
             ctk.CTkLabel(
                 details,
-                text=f"IP: {device_ip} • Port: 5555",
+                text=f"{device_ip}:{DEFAULT_PORT}",
                 font=ctk.CTkFont(size=12),
-                text_color=("#AAAAAA", "#888888")
+                text_color=("#666666", "#AAAAAA"),
             ).pack(anchor="w")
 
-            # Connect button
-            connect_btn = ctk.CTkButton(
+            ctk.CTkButton(
                 card,
                 text="Connect",
-                command=lambda ip=device_ip: self._connect_to_device(ip),
                 width=120,
                 height=36,
-                corner_radius=8,
-                fg_color=("#0084FF", "#0084FF"),
-                hover_color=("#0073E6", "#0073E6")
-            )
-            connect_btn.pack(side="right", padx=15, pady=12)
+                command=lambda ip=device_ip: self._connect_to_host(ip, DEFAULT_PORT),
+            ).pack(side="right", padx=15, pady=12)
 
-    def _scan_error(self, error):
-        """Handle scan errors."""
+    def _scan_error(self, error: str) -> None:
         self._scanning = False
-        self.scan_btn.configure(state="normal")
-        self.status_var.set(f"Scan error: {error}")
+        self.scan_btn.configure(state="normal", text="Scan Network")
+        self.status_var.set(f"Scan failed: {error}")
 
-    def _connect_to_device(self, ip):
-        """Connect to a scanned device."""
+    def _connect_to_host(self, ip: str, port: int) -> None:
+        connected = False
         if self.on_connect:
-            self.on_connect(ip, 5555)
-        self.status_var.set(f"Connecting to {ip}...")
+            connected = self.on_connect(ip, port)
+        elif self._connection_manager is not None:
+            connected = self._connection_manager.connect_to_host(ip, port)
 
-    def _manual_connect(self):
-        """Handle manual connection."""
-        ip = self.ip_entry.get().strip()
-        port = self.port_entry.get().strip()
+        self.status_var.set(f"Connected to {ip}:{port}" if connected else f"Connection failed to {ip}:{port}")
 
-        if not ip:
-            self.status_var.set("Error: Please enter an IP address")
+    def _manual_connect(self) -> None:
+        host = self.ip_entry.get().strip()
+        port_text = self.port_entry.get().strip()
+
+        if not host:
+            self.status_var.set("Enter a host or IP address first.")
             return
 
         try:
-            port_num = int(port) if port else 5555
+            port = int(port_text) if port_text else DEFAULT_PORT
         except ValueError:
-            self.status_var.set("Error: Invalid port number")
+            self.status_var.set("Port must be a number.")
             return
 
-        if self.on_connect:
-            self.on_connect(ip, port_num)
-        self.status_var.set(f"Connecting to {ip}:{port_num}...")
+        self._connect_to_host(host, port)
 
-    def refresh_connections(self):
-        """Refresh the connection list."""
+    def refresh_connections(self) -> None:
+        self._refresh_host_info()
         self.scan_network()
