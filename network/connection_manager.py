@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 
 from core.constants import DEFAULT_PORT
 from core.logger import get_logger
+from core.utils import get_tailscale_ip
 from network.ngrok_integration import NgrokIntegration
 from network.packet_system import PacketSystem
 from network.protocol import MessageType, RemoteDeskMessage
@@ -81,6 +82,7 @@ class ConnectionManager:
         self._mouse_controller = None
         self._keyboard_controller = None
         self._ngrok: Optional[NgrokIntegration] = None
+        self._last_public_tunnel_error: Optional[str] = None
         logger.info(f"ConnectionManager initialized on port {server_port}")
 
     def parse_connection_target(self, host: str, port: Optional[int] = None) -> tuple[str, int]:
@@ -135,6 +137,10 @@ class ConnectionManager:
             return "127.0.0.1"
         finally:
             sock.close()
+
+    def get_tailscale_ip(self) -> Optional[str]:
+        """Return the local Tailscale/mesh VPN address when available."""
+        return get_tailscale_ip()
 
     def start_server(self, host: str = "0.0.0.0", port: int = DEFAULT_PORT) -> bool:
         """Start accepting inbound LAN connections."""
@@ -212,16 +218,24 @@ class ConnectionManager:
     def enable_public_tunnel(self, auth_token: Optional[str] = None, region: str = "us") -> Optional[str]:
         """Expose the host port publicly when pyngrok is available."""
         if self._server_socket is None:
+            self._last_public_tunnel_error = "Host server is not running."
             return None
 
         if self._ngrok is None:
             self._ngrok = NgrokIntegration(auth_token=auth_token, region=region)
+        else:
+            self._ngrok._auth_token = auth_token
+            self._ngrok._region = region
+
+        self._last_public_tunnel_error = None
 
         if self._ngrok.start_tunnel(port=self.server_port):
             public_url = self._ngrok.get_public_url()
+            self._last_public_tunnel_error = None
             if public_url:
                 self._emit("status", f"Public endpoint ready: {public_url}", True)
             return public_url
+        self._last_public_tunnel_error = self._ngrok.get_last_error() if self._ngrok is not None else "Unknown ngrok error."
         return None
 
     def disable_public_tunnel(self) -> None:
@@ -234,6 +248,10 @@ class ConnectionManager:
         if self._ngrok is None:
             return None
         return self._ngrok.get_public_url()
+
+    def get_last_public_tunnel_error(self) -> Optional[str]:
+        """Return the last ngrok/public-tunnel error, if any."""
+        return self._last_public_tunnel_error
 
     def has_active_session(self) -> bool:
         """True when hosting with peers or connected to a host."""

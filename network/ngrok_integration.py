@@ -38,6 +38,7 @@ class NgrokIntegration:
         self._tunnel = None
         self._public_url: Optional[str] = None
         self._is_active = False
+        self._last_error: Optional[str] = None
     
     def start_tunnel(
         self,
@@ -57,21 +58,29 @@ class NgrokIntegration:
             True if tunnel started successfully, False otherwise
         """
         try:
+            self._last_error = None
             # Import pyngrok here to allow graceful failure if not installed
             from pyngrok import ngrok
+            from pyngrok.conf import PyngrokConfig
             
-            # Set auth token if provided
-            if self._auth_token:
-                ngrok.set_auth_token(self._auth_token)
-            
-            # Configure region
-            ngrok.set_default_region(self._region)
+            pyngrok_config = PyngrokConfig(
+                auth_token=self._auth_token,
+                region=self._region,
+            )
             
             # Start tunnel
             if proto == "http":
-                self._tunnel = ngrok.connect(addr=port, proto="http")
+                self._tunnel = ngrok.connect(
+                    addr=port,
+                    proto="http",
+                    pyngrok_config=pyngrok_config,
+                )
             else:
-                self._tunnel = ngrok.connect(addr=port, proto="tcp")
+                self._tunnel = ngrok.connect(
+                    addr=port,
+                    proto="tcp",
+                    pyngrok_config=pyngrok_config,
+                )
             
             if self._tunnel:
                 self._public_url = self._tunnel.public_url
@@ -89,14 +98,16 @@ class NgrokIntegration:
             
         except ImportError:
             # pyngrok not installed - return False for graceful handling
+            self._last_error = "pyngrok not installed. Install with: pip install pyngrok"
             if self._on_status_change:
                 self._on_status_change("error", {
-                    "message": "pyngrok not installed. Install with: pip install pyngrok"
+                    "message": self._last_error
                 })
             return False
         except Exception as e:
+            self._last_error = str(e)
             if self._on_status_change:
-                self._on_status_change("error", {"message": str(e)})
+                self._on_status_change("error", {"message": self._last_error})
             return False
     
     def stop_tunnel(self) -> bool:
@@ -120,8 +131,9 @@ class NgrokIntegration:
                 return True
             return False
         except Exception as e:
+            self._last_error = str(e)
             if self._on_status_change:
-                self._on_status_change("error", {"message": str(e)})
+                self._on_status_change("error", {"message": self._last_error})
             return False
     
     def get_public_url(self) -> Optional[str]:
@@ -137,6 +149,10 @@ class NgrokIntegration:
         """Check if a tunnel is currently active."""
         return self._is_active
 
+    def get_last_error(self) -> Optional[str]:
+        """Return the most recent tunnel error, if any."""
+        return self._last_error
+
     def log_info(self, message: str) -> None:
         """Log info message."""
         logger.info(message)
@@ -145,6 +161,7 @@ class NgrokIntegration:
 
     def log_error(self, message: str) -> None:
         """Log error message."""
+        self._last_error = message
         logger.error(message)
         if self._on_status_change:
             self._on_status_change("error", {"message": message})
