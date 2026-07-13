@@ -1,13 +1,13 @@
 {
     "app_name": "RemoteDesk Pro",
     "version": "1.0.0",
-    "theme": "nord",
+    "theme": "dark",
     "accent": "blue",
     "language": "English",
     "fps": 30,
     "quality": "high",
     "notifications": true,
     "download_folder": "downloads",
-    "ngrok_token": "",
+    "ngrok_token": "3Fx6No1mkrbhRlwMs4UoeSlgCkX_6D9JX6dnUgFVyNj9UDJDP",
     "ngrok_region": "us"
 }
