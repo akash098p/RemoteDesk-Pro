@@ -57,7 +57,7 @@ class ConnectionPage(ctk.CTkFrame):
 
         ctk.CTkLabel(
             header,
-            text="Host this device, scan your LAN, or connect manually using a local IP or public endpoint.",
+            text="Host this device, connect on the same LAN, or use a free mesh VPN like Tailscale for cross-network access.",
             font=ctk.CTkFont(size=13),
             text_color=("#666666", "#BBBBBB"),
             wraplength=900,
@@ -89,9 +89,43 @@ class ConnectionPage(ctk.CTkFrame):
         )
         self.host_port_label.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=4)
 
+        tailnet_row = ctk.CTkFrame(host_frame, fg_color="transparent")
+        tailnet_row.pack(fill="x", padx=20, pady=(0, 8))
+
+        self.tailnet_ip_label = ctk.CTkLabel(
+            tailnet_row,
+            text="Tailnet / VPN IP: Not detected",
+            font=ctk.CTkFont(size=13),
+            wraplength=760,
+            justify="left",
+            anchor="w",
+        )
+        self.tailnet_ip_label.pack(side="left", fill="x", expand=True)
+
+        self.copy_tailnet_btn = ctk.CTkButton(
+            tailnet_row,
+            text="Copy Tailnet IP",
+            width=130,
+            height=34,
+            command=self._copy_tailnet_ip,
+            state="disabled",
+        )
+        self.copy_tailnet_btn.pack(side="right", padx=(10, 0))
+
+        self.tailnet_hint_label = ctk.CTkLabel(
+            host_frame,
+            text="Install Tailscale on both devices, sign in, and use the shown Tailnet / VPN IP for free cross-network connections.",
+            font=ctk.CTkFont(size=12),
+            text_color=("#666666", "#AAAAAA"),
+            wraplength=900,
+            justify="left",
+            anchor="w",
+        )
+        self.tailnet_hint_label.pack(fill="x", padx=20, pady=(0, 8))
+
         self.public_link_label = ctk.CTkLabel(
             host_frame,
-            text="Public Link: Not enabled",
+            text="Optional Public Tunnel: Not enabled",
             font=ctk.CTkFont(size=13),
             wraplength=900,
             justify="left",
@@ -101,7 +135,7 @@ class ConnectionPage(ctk.CTkFrame):
 
         self.public_help_label = ctk.CTkLabel(
             host_frame,
-            text="For internet access, create a public TCP link and share that exact endpoint with the other device.",
+            text="Best free method: install Tailscale on both devices, sign in, and connect using the Tailnet / VPN IP shown here. Public TCP tunnels are optional and may require a paid tunnel provider account.",
             font=ctk.CTkFont(size=12),
             text_color=("#666666", "#AAAAAA"),
             wraplength=900,
@@ -184,7 +218,7 @@ class ConnectionPage(ctk.CTkFrame):
 
         ctk.CTkLabel(
             manual_frame,
-            text="Use a LAN IP like 192.168.x.x for same-network sessions, or paste a public endpoint like tcp://0.tcp.in.ngrok.io:12345 for internet sessions.",
+            text="Use a LAN IP like 192.168.x.x on the same network, a Tailnet / VPN IP like 100.x.x.x for free cross-network sessions, or a public TCP endpoint if you already have one.",
             font=ctk.CTkFont(size=12),
             text_color=("#666666", "#AAAAAA"),
             wraplength=900,
@@ -266,11 +300,26 @@ class ConnectionPage(ctk.CTkFrame):
             return
         self.host_ip_label.configure(text=f"LAN IP: {manager.get_local_ip()}")
         self.host_port_label.configure(text=f"Port: {manager.server_port}")
+        tailnet_ip = manager.get_tailscale_ip()
+        if tailnet_ip:
+            self.tailnet_ip_label.configure(text=f"Tailnet / VPN IP: {tailnet_ip}")
+            self.copy_tailnet_btn.configure(state="normal")
+            self.tailnet_hint_label.configure(
+                text="Tailscale detected. Install Tailscale on the other device too, sign in to the same tailnet, then connect using this IP and port 5000."
+            )
+        else:
+            self.tailnet_ip_label.configure(
+                text="Tailnet / VPN IP: Not detected (install and sign in to Tailscale on this device)"
+            )
+            self.copy_tailnet_btn.configure(state="disabled")
+            self.tailnet_hint_label.configure(
+                text="Tailscale not detected. Install it on both devices, sign in, then click Refresh Info. Download: tailscale.com/download"
+            )
         public_endpoint = manager.get_public_endpoint()
         if public_endpoint:
-            self.public_link_label.configure(text=f"Public Link: {public_endpoint}")
+            self.public_link_label.configure(text=f"Optional Public Tunnel: {public_endpoint}")
         else:
-            self.public_link_label.configure(text="Public Link: Not enabled")
+            self.public_link_label.configure(text="Optional Public Tunnel: Not enabled")
         self.status_var.set(manager.get_session_summary())
 
     def _disconnect_session(self) -> None:
@@ -280,6 +329,21 @@ class ConnectionPage(ctk.CTkFrame):
         manager.disconnect_active_session()
         self.status_var.set("Session disconnected.")
         self._refresh_host_info()
+
+    def _copy_tailnet_ip(self) -> None:
+        manager = self._connection_manager
+        if manager is None:
+            return
+        tailnet_ip = manager.get_tailscale_ip()
+        if not tailnet_ip:
+            self.status_var.set("No Tailnet / VPN IP detected yet.")
+            return
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(tailnet_ip)
+            self.status_var.set(f"Copied Tailnet / VPN IP: {tailnet_ip}")
+        except Exception:
+            self.status_var.set("Unable to copy the Tailnet / VPN IP.")
 
     def _enable_public_link(self) -> None:
         manager = self._connection_manager
@@ -301,7 +365,8 @@ class ConnectionPage(ctk.CTkFrame):
             self.public_link_label.configure(text=f"Public Link: {public_url}")
             self.status_var.set("Public link ready. Share that exact TCP endpoint with the other device.")
         else:
-            self.status_var.set("Public link unavailable. Install pyngrok and configure an ngrok token if needed.")
+            error_message = manager.get_last_public_tunnel_error() or "Unknown ngrok error."
+            self.status_var.set(f"Public link failed: {error_message}")
 
     def scan_network(self) -> None:
         """Scan local network for hosts listening on the RemoteDesk port."""
