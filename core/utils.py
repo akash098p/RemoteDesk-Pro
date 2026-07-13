@@ -12,9 +12,11 @@ from __future__ import annotations
 import os
 import sys
 import platform
+import socket
+import ipaddress
 from pathlib import Path
 from functools import lru_cache
-from typing import Any, Callable, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union
 
 import psutil
 import customtkinter
@@ -166,6 +168,33 @@ def get_system_info() -> Dict[str, str]:
         "RAM Total": f"{round(psutil.virtual_memory().total / (1024**3), 2)} GB",
     }
     return info
+
+def get_tailscale_ip() -> Optional[str]:
+    """
+    Return the local Tailscale IPv4 address when available.
+
+    Tailscale usually assigns addresses from 100.64.0.0/10.
+    """
+    try:
+        tailscale_network = ipaddress.ip_network("100.64.0.0/10")
+        for interface_name, addresses in psutil.net_if_addrs().items():
+            lowered = interface_name.lower()
+            for address in addresses:
+                if getattr(address, "family", None) != socket.AF_INET:
+                    continue
+                ip = getattr(address, "address", "")
+                if not ip:
+                    continue
+                if "tailscale" in lowered:
+                    return ip
+                try:
+                    if ipaddress.ip_address(ip) in tailscale_network:
+                        return ip
+                except ValueError:
+                    continue
+    except Exception as e:
+        logger.debug(f"Unable to detect Tailscale IP: {e}")
+    return None
 
 def get_resource_path(relative_path: Union[str, Path]) -> Path:
     """
