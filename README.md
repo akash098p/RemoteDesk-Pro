@@ -324,7 +324,7 @@ Coming Soon
 | Logger | ✅ |
 | Dashboard | 🚧 |
 | Networking | 🚧 |
-| Screen Sharing | ✅ |
+| Screen Sharing | 🚧 |
 | Chat | ✅ |
 | File Transfer | 🚧 |
 | Clipboard | ✅ |
