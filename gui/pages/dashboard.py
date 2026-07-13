@@ -279,6 +279,10 @@ class DashboardPage(ctk.CTkFrame):
         manager = self._connection_manager
         if manager is not None:
             self.session_value.configure(text=manager.get_session_summary())
-            self.network_value.configure(text=f"Host on {manager.get_local_ip()}:{manager.server_port}")
+            tailnet_ip = manager.get_tailscale_ip()
+            if tailnet_ip:
+                self.network_value.configure(text=f"Tailnet ready on {tailnet_ip}:{manager.server_port}")
+            else:
+                self.network_value.configure(text=f"Host on {manager.get_local_ip()}:{manager.server_port}")
             self.footer_status.configure(text=manager.get_session_summary())
         self.after(1000, self._update_system_status)
