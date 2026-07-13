@@ -319,15 +319,15 @@ Coming Soon
 | Module | Status |
 |---------|--------|
 | Project Structure | ✅ |
-| GUI Foundation | 🚧 |
-| Theme Engine | 🚧 |
-| Logger | 🚧 |
-| Dashboard | ⏳ |
-| Networking | ⏳ |
-| Screen Sharing | ⏳ |
-| Chat | ⏳ |
-| File Transfer | ⏳ |
-| Clipboard | ⏳ |
+| GUI Foundation | ✅ |
+| Theme Engine | ✅ |
+| Logger | ✅ |
+| Dashboard | 🚧 |
+| Networking | 🚧 |
+| Screen Sharing | ✅ |
+| Chat | ✅ |
+| File Transfer | 🚧 |
+| Clipboard | ✅ |
 | Audio | ⏳ |
 
 ---
