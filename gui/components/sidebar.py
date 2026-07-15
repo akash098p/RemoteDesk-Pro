@@ -58,7 +58,14 @@ class Sidebar(customtkinter.CTkFrame):
             navigate_callback: Function to call when item clicked (takes page_key)
             **kwargs: Additional widget configuration
         """
-        super().__init__(master, width=SIDEBAR_WIDTH, corner_radius=10, fg_color="#2B2B2B")
+        super().__init__(
+            master,
+            width=SIDEBAR_WIDTH,
+            corner_radius=18,
+            fg_color=theme_manager.get_color("sidebar", "#101A2B"),
+            border_width=1,
+            border_color=theme_manager.get_color("border", "#31435F"),
+        )
         self._navigate_callback = navigate_callback
         self._is_expanded: bool = True  # Starts expanded
         self._animation_start_time: Optional[float] = None
@@ -76,6 +83,7 @@ class Sidebar(customtkinter.CTkFrame):
 
         # Configure initial hover state
         self._update_hover_state()
+        theme_manager.register_theme_change_callback(self._on_theme_change)
 
         # Bind events for hover effects
         self.bind("<Enter>", self._on_enter)
@@ -185,9 +193,6 @@ class Sidebar(customtkinter.CTkFrame):
         for button in self._buttons:
             is_active = getattr(button, "_nav_key", None) == active_key
             button.set_active(is_active)
-            # Force re-pack to update layout
-            button.pack_forget()
-            button.pack(fill="x", pady=2)
         # After layout changes, ensure hover visuals are correct
         self._update_hover_state()
 
@@ -213,21 +218,25 @@ class Sidebar(customtkinter.CTkFrame):
             if hover:
                 # Highlight on hover (only works when expanded)
                 if self._is_expanded:
-                    try:
-                        hover_color = theme_manager.get_color("sidebar_button_hover_bg", "#3A3A3A")
-                    except Exception:
-                        hover_color = "#3A3A3A"
-                    button.configure(fg_color=hover_color)
-                    button._hover_state = True
+                    if not getattr(button, "_is_active", False):
+                        try:
+                            hover_color = theme_manager.get_color("sidebar_button_hover_bg", "#3A3A3A")
+                        except Exception:
+                            hover_color = "#3A3A3A"
+                        button.configure(fg_color=hover_color)
+                        button._hover_state = True
             else:
                 if hover is False and not self._is_expanded:
                     continue
-                try:
-                    bg = theme_manager.get_color("sidebar_button_bg", "#2B2B2B")
-                except Exception:
-                    bg = "#2B2B2B"
-                button.configure(fg_color=bg)
+                button._apply_theme_colors()
                 button._hover_state = False
+
+    def _on_theme_change(self, theme_name: str) -> None:
+        self.configure(
+            fg_color=theme_manager.get_color("sidebar", "#101A2B"),
+            border_color=theme_manager.get_color("border", "#31435F"),
+        )
+        self._update_hover_state()
 
     def _on_configure(self, event) -> None:
         """Handle widget resize events and maintain layout integrity."""
@@ -312,5 +321,9 @@ class Sidebar(customtkinter.CTkFrame):
         # Ensure layout is updated
         self.pack_propagate()
         logger.debug(f"Sidebar animation complete. Expanded: {self._is_expanded}")
+
+    def destroy(self) -> None:
+        theme_manager.unregister_theme_change_callback(self._on_theme_change)
+        super().destroy()
 
 
