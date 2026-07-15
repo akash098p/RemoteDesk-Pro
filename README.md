@@ -134,16 +134,17 @@ Everything is built in Python using a modular architecture for easy maintenance 
 
 | Category | Technology |
 |------------|----------------|
-| Language | Python 3.12+ |
+| Language | Python 3.14+ |
 | GUI | CustomTkinter |
-| Screen Capture | VidStream + MSS |
-| Video Processing | OpenCV |
+| Screen Capture | MSS |
 | Networking | Python Socket |
-| Tunnel | Ngrok |
+| Cross-Network Access | Pyngrok / Tailscale-friendly manual endpoints |
 | Images | Pillow |
+| System Monitoring | Psutil |
 | Clipboard | Pyperclip |
-| Remote Control | Pynput |
-| Audio | SoundDevice *(planned)* |
+| Remote Control | Pynput + PyAutoGUI |
+| Input / Emoji / UX Helpers | Emoji, ScreenInfo, Requests |
+| Audio | SoundDevice / PyAudio *(optional)* |
 | Logging | Python Logging |
 | Config | JSON |
 | Packaging | PyInstaller |
@@ -242,21 +243,32 @@ RemoteDesk-Pro/
 
 ---
 
-## ✅ Phase 7 — Remote Control
+## 🚧 Phase 7 — Remote Control & Session Reliability
 
 - Remote Mouse
 - Remote Keyboard
 - Permission System
 - Secure session controls
+- Session cleanup and disconnect handling
+- Cross-page stability improvements
 
 ---
 
-## 🚧 Phase 8 — Polishing & Release
+## 🚧 Phase 8 — Cross-Network Access & Audio
 
-- Audio Streaming
-- Notifications
+- Public endpoint guidance and tunnel UX
+- Optional live audio dependencies
+- Better host / peer connection flow
+- Internet-session reliability improvements
+
+---
+
+## ⏳ Phase 9 — Polishing & Release
+
 - Performance Optimization
-- Packaging
+- Notifications refinement
+- Packaging and distribution testing
+- Multi-device validation on different networks
 
 ---
 
@@ -322,12 +334,16 @@ Coming Soon
 | GUI Foundation | ✅ |
 | Theme Engine | ✅ |
 | Logger | ✅ |
-| Dashboard | 🚧 |
+| Dashboard | ✅ |
+| Navigation / Sidebar UX | ✅ |
+| About Page | ✅ |
 | Networking | 🚧 |
 | Screen Sharing | 🚧 |
+| Remote Control | 🚧 |
 | Chat | ✅ |
 | File Transfer | 🚧 |
 | Clipboard | ✅ |
+| Public Tunnel / Internet Access | 🚧 |
 | Audio | ⏳ |
 
 ---
