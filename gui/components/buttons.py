@@ -65,7 +65,7 @@ class BaseButton(customtkinter.CTkButton):
             width=width,
             height=height,
             corner_radius=corner_radius,
-            font=theme_manager.get_font("Inter", font_size, "medium"),
+            font=theme_manager.get_font("Inter", font_size, "normal"),
             **filtered_kwargs,
         )
         self._apply_theme_colors()
