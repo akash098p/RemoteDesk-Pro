@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import webbrowser
+from pathlib import Path
 
 import customtkinter as ctk
 from PIL import Image
@@ -17,7 +18,7 @@ from PIL import Image
 from core.constants import APP_VERSION
 from core.theme_manager import get_theme_manager
 
-ICONS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icons")
+IMAGES_DIR = Path(__file__).resolve().parents[2] / "assets" / "images"
 theme_manager = get_theme_manager()
 
 
@@ -72,7 +73,6 @@ class AboutPage(ctk.CTkFrame):
             [
                 "RemoteDesk Pro",
                 f"Version {APP_VERSION}",
-                "Inspired by AnyDesk, TeamViewer, and Chrome Remote Desktop.",
             ],
         )
         self._info_block(
@@ -86,37 +86,13 @@ class AboutPage(ctk.CTkFrame):
             ],
         )
 
-        features_card = ctk.CTkFrame(scroll_frame, fg_color=section_bg, corner_radius=18, border_width=1, border_color=border)
-        features_card.pack(fill="x", pady=(0, 12))
-
-        ctk.CTkLabel(
-            features_card,
-            text="Feature Highlights",
-            font=ctk.CTkFont(size=22, weight="bold"),
-        ).pack(anchor="w", padx=22, pady=(18, 10))
-
-        for line in [
-            "High-quality desktop streaming with adjustable FPS and quality.",
-            "Permission-based remote control with keyboard and mouse support.",
-            "Two-way chat and attachments during remote sessions.",
-            "Clipboard and file workflows designed for collaboration.",
-            "Cross-network access through public TCP tunneling.",
-        ]:
-            ctk.CTkLabel(
-                features_card,
-                text=f"- {line}",
-                font=ctk.CTkFont(size=13),
-                anchor="w",
-                justify="left",
-                wraplength=920,
-            ).pack(fill="x", padx=22, pady=4)
 
         creator = ctk.CTkFrame(scroll_frame, fg_color=section_bg, corner_radius=18, border_width=1, border_color=border)
         creator.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
             creator,
-            text="Maker",
+            text="Developer",
             font=ctk.CTkFont(size=22, weight="bold"),
         ).pack(anchor="w", padx=22, pady=(18, 8))
 
@@ -145,35 +121,7 @@ class AboutPage(ctk.CTkFrame):
         ]:
             self._create_social_link(links_row, title, label, url, icon_name)
 
-        support = ctk.CTkFrame(scroll_frame, fg_color=section_bg, corner_radius=18, border_width=1, border_color=border)
-        support.pack(fill="x")
-
-        ctk.CTkLabel(
-            support,
-            text="Support the Project",
-            font=ctk.CTkFont(size=22, weight="bold"),
-        ).pack(anchor="w", padx=22, pady=(18, 10))
-
-        for line in [
-            "Star the repository if the project is useful to you.",
-            "Report issues when you find a bug or session problem.",
-            "Suggest new features to help shape the roadmap.",
-        ]:
-            ctk.CTkLabel(
-                support,
-                text=f"- {line}",
-                font=ctk.CTkFont(size=13),
-                anchor="w",
-                justify="left",
-                wraplength=920,
-            ).pack(fill="x", padx=22, pady=4)
-
-        ctk.CTkLabel(
-            support,
-            text="MIT License",
-            font=ctk.CTkFont(size=12),
-            text_color=text_secondary,
-        ).pack(anchor="w", padx=22, pady=(10, 18))
+        
 
     def _info_block(self, parent, column: int, title: str, lines: list[str]) -> None:
         card = ctk.CTkFrame(
@@ -256,8 +204,8 @@ class AboutPage(ctk.CTkFrame):
         self._create_widgets()
 
     def _load_social_icon(self, icon_name: str) -> ctk.CTkImage | None:
-        icon_path = os.path.join(ICONS_DIR, icon_name)
-        if not os.path.exists(icon_path):
+        icon_path = IMAGES_DIR / icon_name
+        if not icon_path.exists():
             return None
 
         image = Image.open(icon_path).convert("RGBA")
