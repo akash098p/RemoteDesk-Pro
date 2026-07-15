@@ -8,6 +8,6 @@
     "quality": "high",
     "notifications": true,
     "download_folder": "downloads",
-    "ngrok_token": "3Fx6No1mkrbhRlwMs4UoeSlgCkX_6D9JX6dnUgFVyNj9UDJDP",
+    "ngrok_token": "",
     "ngrok_region": "us"
 }
