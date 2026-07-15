@@ -31,9 +31,12 @@ class SettingsPage(customtkinter.CTkFrame):
         # Load current settings and theme
         self._settings = self.config_manager.get_config("settings")
         self.theme_var = customtkinter.StringVar(value=self.theme_manager.current_theme_name)
+        self._theme_callback_registered = False
         
         # Create UI
         self._create_widgets()
+        self.theme_manager.register_theme_change_callback(self._handle_theme_refresh)
+        self._theme_callback_registered = True
             
     def _on_theme_change(self, new_theme: Optional[str] = None) -> None:
         if new_theme is None:
@@ -58,10 +61,14 @@ class SettingsPage(customtkinter.CTkFrame):
             self.parent._navigation_manager.show_page("dashboard")
 
     def _create_widgets(self) -> None:
+        text_secondary = self.theme_manager.get_color("text_secondary", "#AEB8C5")
+        surface = self.theme_manager.get_color("surface", "#1A2940")
+        border = self.theme_manager.get_color("border", "#31435F")
         # Header
         title_label = customtkinter.CTkLabel(
             self, text="Settings", 
-            font=customtkinter.CTkFont(size=16, weight="bold")
+            font=customtkinter.CTkFont(size=16, weight="bold"),
+            text_color=self.theme_manager.get_color("text_primary", "#FFFFFF"),
         )
         title_label.pack(pady=20)
         
@@ -71,7 +78,8 @@ class SettingsPage(customtkinter.CTkFrame):
         
         theme_label = customtkinter.CTkLabel(
             theme_frame, text="Theme:",
-            font=customtkinter.CTkFont(size=14)
+            font=customtkinter.CTkFont(size=14),
+            text_color=text_secondary,
         )
         theme_label.pack(side="left", padx=(0, 10))
         
@@ -89,7 +97,8 @@ class SettingsPage(customtkinter.CTkFrame):
         
         font_label = customtkinter.CTkLabel(
             font_frame, text="Font Size:",
-            font=customtkinter.CTkFont(size=14)
+            font=customtkinter.CTkFont(size=14),
+            text_color=text_secondary,
         )
         font_label.pack(side="left", padx=(0, 10))
         
@@ -108,7 +117,8 @@ class SettingsPage(customtkinter.CTkFrame):
         
         quality_label = customtkinter.CTkLabel(
             quality_frame, text="Capture Quality:",
-            font=customtkinter.CTkFont(size=14)
+            font=customtkinter.CTkFont(size=14),
+            text_color=text_secondary,
         )
         quality_label.pack(side="left", padx=(0, 10))
         
@@ -129,7 +139,8 @@ class SettingsPage(customtkinter.CTkFrame):
         
         fps_label = customtkinter.CTkLabel(
             fps_frame, text="Capture FPS:",
-            font=customtkinter.CTkFont(size=14)
+            font=customtkinter.CTkFont(size=14),
+            text_color=text_secondary,
         )
         fps_label.pack(side="left", padx=(0, 10))
         
@@ -148,3 +159,13 @@ class SettingsPage(customtkinter.CTkFrame):
             self, text="Back", command=self._back_to_dashboard
         )
         back_btn.pack(pady=20)
+
+    def _handle_theme_refresh(self, theme_name: str) -> None:
+        for child in self.winfo_children():
+            child.destroy()
+        self._create_widgets()
+
+    def destroy(self) -> None:
+        if self._theme_callback_registered:
+            self.theme_manager.unregister_theme_change_callback(self._handle_theme_refresh)
+        super().destroy()
