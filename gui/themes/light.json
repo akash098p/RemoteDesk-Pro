@@ -39,7 +39,9 @@
     "notification_badge": "#2F7DDA",
     "notification_close_bg": "#E16A79",
     "notification_close_hover": "#D94F63",
+    "icon_button_bg": "#F2F6FC",
     "icon_button_hover_bg": "#E4EDF9",
+    "icon_button_text": "#132033",
     "glass_overlay": "#FFFFFF",
     "glass_overlay_alt": "#F3F7FD",
     "glass_highlight": "#E8F0FB"
