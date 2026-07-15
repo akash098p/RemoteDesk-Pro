@@ -16,9 +16,11 @@ from PIL import Image
 
 from core.constants import DEFAULT_FPS, DEFAULT_QUALITY
 from core.logger import get_logger
+from core.theme_manager import get_theme_manager
 from core.utils import get_cpu_usage, get_ram_usage
 
 logger = get_logger()
+theme_manager = get_theme_manager()
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icons")
 
@@ -39,7 +41,10 @@ class DashboardPage(ctk.CTkFrame):
         self._cpu_usage = 0.0
         self._ram_usage = 0.0
         self._action_icons: list[ctk.CTkImage] = []
+        self._theme_callback_registered = False
         self._build_ui()
+        theme_manager.register_theme_change_callback(self._on_theme_change)
+        self._theme_callback_registered = True
         self.after(0, self._update_system_status)
 
     @property
@@ -47,10 +52,19 @@ class DashboardPage(ctk.CTkFrame):
         return getattr(self.master, "_connection_manager", None)
 
     def _build_ui(self) -> None:
+        surface = theme_manager.get_color("surface", "#1A2940")
+        card_bg = theme_manager.get_color("card_bg", theme_manager.get_color("card", "#162235"))
+        text_secondary = theme_manager.get_color("text_secondary", "#AEB8C5")
+        summary_bg = theme_manager.get_color("glass_overlay", card_bg)
+        summary_alt = theme_manager.get_color("glass_overlay_alt", surface)
+        button_bg = theme_manager.get_color("primary", "#2F7DDA")
+        button_hover = theme_manager.get_color("primary_hover", "#4D93E5")
+        border = theme_manager.get_color("border", "#31435F")
+
         self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.scroll_frame.pack(fill="both", expand=True, padx=18, pady=(12, 10))
 
-        hero = ctk.CTkFrame(self.scroll_frame, fg_color=("#F4F7FB", "#1D232B"), corner_radius=18)
+        hero = ctk.CTkFrame(self.scroll_frame, fg_color=summary_bg, corner_radius=18, border_width=1, border_color=border)
         hero.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
@@ -63,7 +77,7 @@ class DashboardPage(ctk.CTkFrame):
             hero,
             text="Share your screen, connect to devices, and keep remote sessions under control from one place.",
             font=ctk.CTkFont(size=13),
-            text_color=("#5B6574", "#AEB8C5"),
+            text_color=text_secondary,
             wraplength=900,
             justify="left",
         ).pack(anchor="w", padx=24, pady=(0, 14))
@@ -85,7 +99,7 @@ class DashboardPage(ctk.CTkFrame):
         self.cpu_value = self._create_metric_card(stats_row, 0, "CPU Usage", "0.0%", "#11B8FF")
         self.ram_value = self._create_metric_card(stats_row, 1, "RAM Usage", "0.0%", "#58C15D")
 
-        actions_card = ctk.CTkFrame(self.scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=18)
+        actions_card = ctk.CTkFrame(self.scroll_frame, fg_color=surface, corner_radius=18, border_width=1, border_color=border)
         actions_card.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
@@ -98,7 +112,7 @@ class DashboardPage(ctk.CTkFrame):
             actions_card,
             text="Jump straight into sharing, control, files, and settings without hunting through the sidebar.",
             font=ctk.CTkFont(size=12),
-            text_color=("#5B6574", "#AEB8C5"),
+            text_color=text_secondary,
             wraplength=900,
             justify="left",
         ).pack(anchor="w", padx=22, pady=(0, 14))
@@ -122,7 +136,7 @@ class DashboardPage(ctk.CTkFrame):
             col = index % 3
             self._create_action_card(actions_grid, row, col, icon_file, title, description, command)
 
-        tips_card = ctk.CTkFrame(self.scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=18)
+        tips_card = ctk.CTkFrame(self.scroll_frame, fg_color=surface, corner_radius=18, border_width=1, border_color=border)
         tips_card.pack(fill="x", pady=(0, 4))
 
         ctk.CTkLabel(
@@ -149,19 +163,25 @@ class DashboardPage(ctk.CTkFrame):
             tips_card,
             text="Ready to share your screen.",
             font=ctk.CTkFont(size=12),
-            text_color=("#5B6574", "#AEB8C5"),
+            text_color=text_secondary,
         )
         self.footer_status.pack(anchor="w", padx=22, pady=(10, 18))
 
     def _create_summary_card(self, parent, column: int, title: str, value: str) -> ctk.CTkLabel:
-        card = ctk.CTkFrame(parent, fg_color=("white", "#14191F"), corner_radius=14)
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=theme_manager.get_color("glass_overlay_alt", theme_manager.get_color("card_bg", "#162235")),
+            corner_radius=14,
+            border_width=1,
+            border_color=theme_manager.get_color("border", "#31435F"),
+        )
         card.grid(row=0, column=column, sticky="nsew", padx=6, pady=4)
 
         ctk.CTkLabel(
             card,
             text=title,
             font=ctk.CTkFont(size=12, weight="bold"),
-            text_color=("#667085", "#93A0B0"),
+            text_color=theme_manager.get_color("text_secondary", "#93A0B0"),
         ).pack(anchor="w", padx=16, pady=(14, 4))
 
         value_label = ctk.CTkLabel(
@@ -175,14 +195,20 @@ class DashboardPage(ctk.CTkFrame):
         return value_label
 
     def _create_metric_card(self, parent, column: int, title: str, value: str, accent: str) -> ctk.CTkLabel:
-        card = ctk.CTkFrame(parent, fg_color=("gray95", "#1A1A1A"), corner_radius=18)
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=theme_manager.get_color("surface", "#1A2940"),
+            corner_radius=18,
+            border_width=1,
+            border_color=theme_manager.get_color("border", "#31435F"),
+        )
         card.grid(row=0, column=column, sticky="nsew", padx=6, pady=4)
 
         ctk.CTkLabel(
             card,
             text=title,
             font=ctk.CTkFont(size=15, weight="bold"),
-            text_color=("#667085", "#93A0B0"),
+            text_color=theme_manager.get_color("text_secondary", "#93A0B0"),
         ).pack(anchor="w", padx=20, pady=(18, 10))
 
         value_label = ctk.CTkLabel(
@@ -204,7 +230,13 @@ class DashboardPage(ctk.CTkFrame):
         description: str,
         command,
     ) -> None:
-        card = ctk.CTkFrame(parent, fg_color=("white", "#14191F"), corner_radius=16)
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=theme_manager.get_color("glass_overlay_alt", theme_manager.get_color("card_bg", "#162235")),
+            corner_radius=16,
+            border_width=1,
+            border_color=theme_manager.get_color("border", "#31435F"),
+        )
         card.grid(row=row, column=column, sticky="nsew", padx=6, pady=6)
 
         button_icon = None
@@ -224,7 +256,7 @@ class DashboardPage(ctk.CTkFrame):
             card,
             text=description,
             font=ctk.CTkFont(size=12),
-            text_color=("#5B6574", "#AEB8C5"),
+            text_color=theme_manager.get_color("text_secondary", "#AEB8C5"),
             justify="left",
             wraplength=240,
             anchor="w",
@@ -238,9 +270,16 @@ class DashboardPage(ctk.CTkFrame):
             height=40,
             corner_radius=12,
             command=command,
-            fg_color=("#2F7DDA", "#243E5B"),
-            hover_color=("#276BBB", "#2C5073"),
+            fg_color=theme_manager.get_color("primary", "#2F7DDA"),
+            hover_color=theme_manager.get_color("primary_hover", "#4D93E5"),
         ).pack(fill="x", padx=18, pady=(0, 18))
+
+    def _on_theme_change(self, theme_name: str) -> None:
+        for child in self.winfo_children():
+            child.destroy()
+        self._action_icons.clear()
+        self._build_ui()
+        self._update_system_status()
 
     def _start_sharing(self):
         logger.info("Starting screen sharing")
@@ -286,3 +325,8 @@ class DashboardPage(ctk.CTkFrame):
                 self.network_value.configure(text=f"Host on {manager.get_local_ip()}:{manager.server_port}")
             self.footer_status.configure(text=manager.get_session_summary())
         self.after(1000, self._update_system_status)
+
+    def destroy(self) -> None:
+        if self._theme_callback_registered:
+            theme_manager.unregister_theme_change_callback(self._on_theme_change)
+        super().destroy()
