@@ -105,6 +105,7 @@ class MainWindow(customtkinter.CTk):
         self._screen_page: "ScreenPage" | None = None
         self.username = self.config_manager.get_value("config", "username", "Local")
         self._is_running = False
+        self._theme_manager.register_theme_change_callback(self._on_theme_change)
 
         # Initialize
         self._setup_window()
@@ -154,11 +155,12 @@ class MainWindow(customtkinter.CTk):
         self.content_frame = customtkinter.CTkFrame(
             self,
             fg_color=self._theme_manager.get_color("background", "#0D0D0D"),
+            corner_radius=0,
         )
         self.content_frame._app = self
         self.content_frame._theme_manager = self._theme_manager
         self.content_frame._connection_manager = self.connection_manager
-        self.content_frame.pack(fill="both", expand=True)
+        self.content_frame.pack(fill="both", expand=True, padx=(10, 10), pady=(10, 8))
 
         # Create status bar
         self.status_bar = StatusBar(
@@ -283,6 +285,12 @@ class MainWindow(customtkinter.CTk):
         self._theme_manager.set_theme(new_theme)
         self.config_manager.set_value("config", "theme", new_theme)
 
+    def _on_theme_change(self, theme_name: str) -> None:
+        if hasattr(self, "content_frame"):
+            self.content_frame.configure(
+                fg_color=self._theme_manager.get_color("background", "#0D0D0D")
+            )
+
     def send_chat_message(self, content: str) -> None:
         """Send a chat message through the app controller.
 
@@ -329,6 +337,7 @@ class MainWindow(customtkinter.CTk):
         self.mainloop()
         self._is_running = False
         self.connection_manager.disconnect_all()
+        self._theme_manager.unregister_theme_change_callback(self._on_theme_change)
 
 
 def create_main_window(config_manager) -> MainWindow:
