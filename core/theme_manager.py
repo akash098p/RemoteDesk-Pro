@@ -33,6 +33,7 @@ from core.logger import get_logger
 
 logger = get_logger()
 config_manager = get_config_manager()
+SUPPORTED_THEMES = {"dark", "light"}
 
 class ThemeManager:
     """
@@ -83,8 +84,9 @@ class ThemeManager:
         THEMES_DIR.mkdir(parents=True, exist_ok=True)
         for theme_file in THEMES_DIR.glob("*.json"):
             theme_name = theme_file.stem  # Get filename without extension
-            self._available_themes[theme_name] = theme_file
-            logger.debug(f"Found theme file: {theme_name} at {theme_file}")
+            if theme_name in SUPPORTED_THEMES:
+                self._available_themes[theme_name] = theme_file
+                logger.debug(f"Found theme file: {theme_name} at {theme_file}")
 
         if not self._available_themes:
             logger.warning(f"No theme files found in {THEMES_DIR}. Defaulting to hardcoded colors.")
