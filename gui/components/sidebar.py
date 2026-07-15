@@ -8,17 +8,19 @@ Defines a collapsible navigation sidebar with smooth animations and theme integr
 
 from __future__ import annotations
 
+from pathlib import Path
 import time
 from typing import Callable, List, Optional
 
 import customtkinter
+from PIL import Image
 
 from core.constants import (
     SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_ANIMATION_SPEED
 )
 from core.logger import get_logger
 from core.theme_manager import get_theme_manager
-from gui.components.buttons import SidebarButton
+from gui.components.buttons import IconButton, SidebarButton
 
 # Acquire logger safely — fall back to standard logging if core logger isn't available
 try:
@@ -29,6 +31,7 @@ except Exception:
     logger = _logging.getLogger(__name__)
 
 theme_manager = get_theme_manager()
+SIDEBAR_IMAGE_PATH = Path(__file__).resolve().parents[2] / "assets" / "images" / "sidebar.jpg"
 
 
 class Sidebar(customtkinter.CTkFrame):
@@ -72,14 +75,35 @@ class Sidebar(customtkinter.CTkFrame):
         self._is_toggling: bool = False
         self._current_height: int = 0
         self._current_width: int = SIDEBAR_WIDTH
+        self._background_source: Optional[Image.Image] = None
+        self._background_image: Optional[customtkinter.CTkImage] = None
 
-        # Create navigation container correctly (don't assign result of pack())
+        self.pack_propagate(False)
+
+        self._background_label = customtkinter.CTkLabel(self, text="", fg_color="transparent")
+        self._background_label.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self._background_label.lower()
+        self._load_sidebar_background()
+        self.after(0, self._refresh_sidebar_background)
+
+        self._header_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        self._header_frame.pack(fill="x", padx=8, pady=(10, 6))
+
+        self._toggle_button = IconButton(
+            self._header_frame,
+            command=self.toggle,
+            icon="menu.png",
+            width=36,
+            height=36,
+            corner_radius=10,
+        )
+        self._toggle_button.pack(side="left")
+
         self._nav_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        self._nav_frame.pack(fill="y", padx=5, pady=10)
+        self._nav_frame.pack(fill="both", expand=True, padx=5, pady=(0, 10))
 
-        # Create toggle button for collapse (handle externally via toolbar)
-        self._is_toggling = False
         self._create_navigation_items()
+        self._update_visibility()
 
         # Configure initial hover state
         self._update_hover_state()
@@ -98,7 +122,7 @@ class Sidebar(customtkinter.CTkFrame):
         nav_items = [
             {
                 "key": "dashboard",
-                "icon": "dashboard.svg",
+                "icon": "dashboard.png",
                 "text": "Dashboard",
                 "hover_text": "Main Overview",
                 "icon_size": 24
@@ -126,7 +150,7 @@ class Sidebar(customtkinter.CTkFrame):
             },
             {
                 "key": "clipboard",
-                "icon": "clipboard.svg",
+                "icon": "clipboard.png",
                 "text": "Clipboard",
                 "hover_text": "Clipboard Sync",
                 "icon_size": 24
@@ -170,6 +194,7 @@ class Sidebar(customtkinter.CTkFrame):
             )
             # Set nav key as attribute (SidebarButton may not expose a private setter)
             button._nav_key = item["key"]
+            button._full_text = item["text"]
             button.pack(fill="x", pady=2)
             self._buttons.append(button)
 
@@ -236,6 +261,7 @@ class Sidebar(customtkinter.CTkFrame):
             fg_color=theme_manager.get_color("sidebar", "#101A2B"),
             border_color=theme_manager.get_color("border", "#31435F"),
         )
+        self._update_visibility()
         self._update_hover_state()
 
     def _on_configure(self, event) -> None:
@@ -243,19 +269,23 @@ class Sidebar(customtkinter.CTkFrame):
         if event.widget == self and not self._is_toggling:
             self._current_height = event.height
             self._current_width = getattr(event, "width", self._current_width)
+            self._refresh_sidebar_background()
             logger.debug(f"Sidebar resize detected: {self._current_height}x{self._current_width}")
 
     def toggle(self) -> None:
         """
-        Toggle between expanded and collapsed states with animation.
-        Starts animation sequence using master.after() for smooth timing.
+        Toggle between expanded and collapsed states.
         """
         if self._is_toggling:
-            return  # Prevent multiple toggles
+            return
 
         self._is_toggling = True
-        self._animation_start_time = time.time()
-        self._animate_toggle()
+        self._is_expanded = not self._is_expanded
+        self.configure(width=SIDEBAR_WIDTH if self._is_expanded else SIDEBAR_COLLAPSED_WIDTH)
+        self._update_visibility()
+        self._refresh_sidebar_background()
+        self.update_idletasks()
+        self._is_toggling = False
 
     def _animate_toggle(self) -> None:
         """Perform smooth width animation between expanded and collapsed states."""
@@ -297,30 +327,49 @@ class Sidebar(customtkinter.CTkFrame):
         self._update_visibility()
 
     def _update_visibility(self) -> None:
-        """Update visibility of text labels in collapsed state."""
+        """Update button layout for expanded and collapsed states."""
+        toggle_padding = (0, 0) if self._is_expanded else (4, 0)
+        self._toggle_button.pack_configure(padx=toggle_padding)
+
         for button in self._buttons:
-            text_widget = getattr(button, '_text_widget', None)
-            if text_widget:
-                # When expanded, show text; when collapsed, hide text
-                if self._is_expanded:
-                    text_widget.pack(side="left", expand=True)
-                else:
-                    text_widget.pack_forget()
-            else:
-                # Find text widget in button's children
-                for child in button.winfo_children():
-                    if isinstance(child, customtkinter.CTkLabel) and child.cget("text"):
-                        if self._is_expanded:
-                            child.pack(side="left", expand=True)
-                        else:
-                            child.pack_forget()
+            button.configure(
+                text=getattr(button, "_full_text", button.cget("text")) if self._is_expanded else "",
+                width=(SIDEBAR_WIDTH - 20) if self._is_expanded else (SIDEBAR_COLLAPSED_WIDTH - 14),
+                anchor="w" if self._is_expanded else "center",
+            )
+            button.pack_configure(padx=0, pady=2)
 
     def _finalize_toggle(self) -> None:
         """Complete toggle animation and reset state."""
         self._is_toggling = False
-        # Ensure layout is updated
-        self.pack_propagate()
+        self.configure(width=SIDEBAR_WIDTH if self._is_expanded else SIDEBAR_COLLAPSED_WIDTH)
+        self._update_visibility()
+        self._refresh_sidebar_background()
         logger.debug(f"Sidebar animation complete. Expanded: {self._is_expanded}")
+
+    def _load_sidebar_background(self) -> None:
+        if not SIDEBAR_IMAGE_PATH.exists():
+            return
+        try:
+            self._background_source = Image.open(SIDEBAR_IMAGE_PATH).convert("RGB")
+            self._refresh_sidebar_background()
+        except Exception as exc:
+            logger.warning(f"Unable to load sidebar background image: {exc}")
+
+    def _refresh_sidebar_background(self) -> None:
+        if self._background_source is None:
+            return
+
+        width = max(int(self.winfo_width() or self.cget("width") or SIDEBAR_WIDTH), 1)
+        height = max(int(self.winfo_height() or self._current_height or 1), 1)
+        resized = self._background_source.resize((width, height), Image.LANCZOS)
+        self._background_image = customtkinter.CTkImage(
+            light_image=resized,
+            dark_image=resized,
+            size=(width, height),
+        )
+        self._background_label.configure(image=self._background_image)
+        self._background_label.lower()
 
     def destroy(self) -> None:
         theme_manager.unregister_theme_change_callback(self._on_theme_change)
