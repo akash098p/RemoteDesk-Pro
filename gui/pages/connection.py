@@ -16,8 +16,10 @@ import customtkinter as ctk
 
 from core.constants import DEFAULT_PORT
 from core.logger import get_logger
+from core.theme_manager import get_theme_manager
 
 logger = get_logger()
+theme_manager = get_theme_manager()
 
 
 class ConnectionPage(ctk.CTkFrame):
@@ -29,7 +31,10 @@ class ConnectionPage(ctk.CTkFrame):
         self._scan_results: list[str] = []
         self._scanning = False
         self._scan_thread: Optional[threading.Thread] = None
+        self._theme_callback_registered = False
         self._create_widgets()
+        theme_manager.register_theme_change_callback(self._on_theme_change)
+        self._theme_callback_registered = True
         self.after(200, self._refresh_host_info)
         self.after(350, self.refresh_connections)
 
@@ -42,29 +47,34 @@ class ConnectionPage(ctk.CTkFrame):
         return getattr(self.master, "_connection_manager", None)
 
     def _create_widgets(self) -> None:
+        hero_bg = theme_manager.get_color("glass_overlay", theme_manager.get_color("card_bg", "#162235"))
+        section_bg = theme_manager.get_color("surface", "#1A2940")
+        border = theme_manager.get_color("border", "#31435F")
+        text_secondary = theme_manager.get_color("text_secondary", "#AEB8C5")
+
         self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.scroll_frame.pack(fill="both", expand=True, padx=18, pady=(12, 8))
 
-        header = ctk.CTkFrame(self.scroll_frame, fg_color=("gray92", "#202020"), corner_radius=16)
+        header = ctk.CTkFrame(self.scroll_frame, fg_color=hero_bg, corner_radius=16, border_width=1, border_color=border)
         header.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
             header,
             text="Connections",
             font=ctk.CTkFont(size=28, weight="bold"),
-            text_color=("#111111", "#FFFFFF"),
+            text_color=theme_manager.get_color("text_primary", "#FFFFFF"),
         ).pack(anchor="w", padx=20, pady=(16, 4))
 
         ctk.CTkLabel(
             header,
             text="Host this device, connect on the same LAN, or use a free mesh VPN like Tailscale for cross-network access.",
             font=ctk.CTkFont(size=13),
-            text_color=("#666666", "#BBBBBB"),
+            text_color=text_secondary,
             wraplength=900,
             justify="left",
         ).pack(anchor="w", padx=20, pady=(0, 16))
 
-        host_frame = ctk.CTkFrame(self.scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=16)
+        host_frame = ctk.CTkFrame(self.scroll_frame, fg_color=section_bg, corner_radius=16, border_width=1, border_color=border)
         host_frame.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
@@ -116,7 +126,7 @@ class ConnectionPage(ctk.CTkFrame):
             host_frame,
             text="Install Tailscale on both devices, sign in, and use the shown Tailnet / VPN IP for free cross-network connections.",
             font=ctk.CTkFont(size=12),
-            text_color=("#666666", "#AAAAAA"),
+            text_color=text_secondary,
             wraplength=900,
             justify="left",
             anchor="w",
@@ -137,7 +147,7 @@ class ConnectionPage(ctk.CTkFrame):
             host_frame,
             text="Best free method: install Tailscale on both devices, sign in, and connect using the Tailnet / VPN IP shown here. Public TCP tunnels are optional and may require a paid tunnel provider account.",
             font=ctk.CTkFont(size=12),
-            text_color=("#666666", "#AAAAAA"),
+            text_color=text_secondary,
             wraplength=900,
             justify="left",
             anchor="w",
@@ -207,7 +217,7 @@ class ConnectionPage(ctk.CTkFrame):
         )
         self.disconnect_btn.pack(side="left", pady=4)
 
-        manual_frame = ctk.CTkFrame(self.scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=16)
+        manual_frame = ctk.CTkFrame(self.scroll_frame, fg_color=section_bg, corner_radius=16, border_width=1, border_color=border)
         manual_frame.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
@@ -220,7 +230,7 @@ class ConnectionPage(ctk.CTkFrame):
             manual_frame,
             text="Use a LAN IP like 192.168.x.x on the same network, a Tailnet / VPN IP like 100.x.x.x for free cross-network sessions, or a public TCP endpoint if you already have one.",
             font=ctk.CTkFont(size=12),
-            text_color=("#666666", "#AAAAAA"),
+            text_color=text_secondary,
             wraplength=900,
             justify="left",
         ).pack(anchor="w", padx=20, pady=(0, 12))
@@ -252,7 +262,7 @@ class ConnectionPage(ctk.CTkFrame):
         )
         self.connect_btn.pack(side="left")
 
-        list_frame = ctk.CTkFrame(self.scroll_frame, fg_color=("gray95", "#1A1A1A"), corner_radius=16)
+        list_frame = ctk.CTkFrame(self.scroll_frame, fg_color=section_bg, corner_radius=16, border_width=1, border_color=border)
         list_frame.pack(fill="x", pady=(0, 8))
 
         list_header = ctk.CTkFrame(list_frame, fg_color="transparent")
@@ -280,7 +290,7 @@ class ConnectionPage(ctk.CTkFrame):
             self.device_scroll,
             text="No devices found yet. Start the app on another device and scan the local network.",
             font=ctk.CTkFont(size=13),
-            text_color=("#777777", "#999999"),
+            text_color=text_secondary,
             wraplength=760,
             justify="left",
         )
@@ -291,8 +301,14 @@ class ConnectionPage(ctk.CTkFrame):
             self,
             textvariable=self.status_var,
             font=ctk.CTkFont(size=12),
-            text_color=("#666666", "#AAAAAA"),
+            text_color=text_secondary,
         ).pack(anchor="w", padx=24, pady=(0, 10))
+
+    def _on_theme_change(self, theme_name: str) -> None:
+        for child in self.winfo_children():
+            child.destroy()
+        self._create_widgets()
+        self._refresh_host_info()
 
     def _refresh_host_info(self) -> None:
         manager = self._connection_manager
@@ -362,7 +378,7 @@ class ConnectionPage(ctk.CTkFrame):
 
         public_url = manager.enable_public_tunnel(auth_token=token, region=region)
         if public_url:
-            self.public_link_label.configure(text=f"Public Link: {public_url}")
+            self.public_link_label.configure(text=f"Optional Public Tunnel: {public_url}")
             self.status_var.set("Public link ready. Share that exact TCP endpoint with the other device.")
         else:
             error_message = manager.get_last_public_tunnel_error() or "Unknown ngrok error."
@@ -452,7 +468,13 @@ class ConnectionPage(ctk.CTkFrame):
             return
 
         for device_ip in devices:
-            card = ctk.CTkFrame(self.device_scroll, fg_color=("white", "#232323"), corner_radius=12)
+            card = ctk.CTkFrame(
+                self.device_scroll,
+                fg_color=theme_manager.get_color("glass_overlay_alt", theme_manager.get_color("card_bg", "#162235")),
+                corner_radius=12,
+                border_width=1,
+                border_color=theme_manager.get_color("border", "#31435F"),
+            )
             card.pack(fill="x", padx=4, pady=6)
 
             details = ctk.CTkFrame(card, fg_color="transparent")
@@ -468,7 +490,7 @@ class ConnectionPage(ctk.CTkFrame):
                 details,
                 text=f"{device_ip}:{DEFAULT_PORT}",
                 font=ctk.CTkFont(size=12),
-                text_color=("#666666", "#AAAAAA"),
+                text_color=theme_manager.get_color("text_secondary", "#AEB8C5"),
             ).pack(anchor="w")
 
             ctk.CTkButton(
@@ -512,3 +534,8 @@ class ConnectionPage(ctk.CTkFrame):
     def refresh_connections(self) -> None:
         self._refresh_host_info()
         self.scan_network()
+
+    def destroy(self) -> None:
+        if self._theme_callback_registered:
+            theme_manager.unregister_theme_change_callback(self._on_theme_change)
+        super().destroy()
