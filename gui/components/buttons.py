@@ -250,7 +250,6 @@ class IconButton(BaseButton):
             fg_color=theme_manager.get_color("icon_button_bg", "transparent"),
             hover_color=theme_manager.get_color("icon_button_hover_bg", "surface_hover"),
             text_color=theme_manager.get_color("icon_button_text", "text_primary"),
-            image_property="text_color",
         )
 
 
@@ -282,5 +281,4 @@ class CloseButton(IconButton):
             fg_color=theme_manager.get_color("close_button_bg", "transparent"),
             hover_color=theme_manager.get_color("close_button_hover_bg", "error"),
             text_color=theme_manager.get_color("close_button_text", "text_primary"),
-            image_property="text_color",
         )
