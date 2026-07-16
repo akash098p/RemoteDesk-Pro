@@ -28,7 +28,7 @@ Everything is built in Python using a modular architecture for easy maintenance 
 # 📹 Live Demo
 
 <p align="center">
-  <img src="media/RemoteDesk Pro.gif" width="90%">
+  <img src="media/RemoteDesk Pro.gif" width="100%">
 </p>
 
 ---
