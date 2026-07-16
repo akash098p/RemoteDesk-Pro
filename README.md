@@ -25,6 +25,19 @@ The goal is to create a lightweight, modern, and secure remote collaboration pla
 Everything is built in Python using a modular architecture for easy maintenance and future expansion.
 
 ---
+# 📹 Live Demo
+
+<p align="center">
+  <img src="media/RemoteDesk Pro.gif" width="90%">
+</p>
+
+---
+
+# 📸 Screenshots
+
+Coming Soon
+
+---
 
 # ✨ Features
 
@@ -317,12 +330,6 @@ Run
 ```bash
 python app.py
 ```
-
----
-
-# 📸 Screenshots
-
-Coming Soon
 
 ---
 
