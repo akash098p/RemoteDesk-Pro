@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from gui.pages.chat import ChatPage
     from gui.pages.clipboard import ClipboardPage
     from gui.pages.screen import ScreenPage
+    from gui.pages.files import FileTransferPage
 
 
 class NavigationManager:
@@ -103,6 +104,7 @@ class MainWindow(customtkinter.CTk):
         self.connection_manager = ConnectionManager(DEFAULT_PORT)
         self._chat_page: "ChatPage" | None = None
         self._screen_page: "ScreenPage" | None = None
+        self._files_page: "FileTransferPage" | None = None
         self.username = self.config_manager.get_value("config", "username", "Local")
         self._is_running = False
         self._theme_manager.register_theme_change_callback(self._on_theme_change)
@@ -128,6 +130,9 @@ class MainWindow(customtkinter.CTk):
 
         # Title
         self.title(f"RemoteDesk Pro v{APP_VERSION}")
+
+        # Global keyboard shortcuts so every page stays reachable without a mouse
+        self._bind_shortcuts()
 
     def _setup_components(self) -> None:
         """Initialize UI components (titlebar, sidebar, content, statusbar)."""
@@ -179,6 +184,7 @@ class MainWindow(customtkinter.CTk):
         from gui.pages.screen import ScreenPage
         from gui.pages.chat import ChatPage
         from gui.pages.clipboard import ClipboardPage
+        from gui.pages.files import FileTransferPage
 
         # Create navigation manager
         self._navigation_manager = NavigationManager(self.content_frame, self.sidebar)
@@ -194,6 +200,8 @@ class MainWindow(customtkinter.CTk):
         self._navigation_manager.register_page("screen", self._screen_page)
         self._chat_page = ChatPage(self.content_frame)
         self._navigation_manager.register_page("chat", self._chat_page)
+        self._files_page = FileTransferPage(self.content_frame)
+        self._navigation_manager.register_page("files", self._files_page)
         self._navigation_manager.register_page("clipboard", ClipboardPage(self.content_frame))
         self._navigation_manager.register_page("settings", SettingsPage(self.content_frame))
         self._navigation_manager.register_page("logs", LogsPage(self.content_frame))
@@ -232,6 +240,18 @@ class MainWindow(customtkinter.CTk):
             "chat_message",
             lambda payload, peer_id=None: self.after(
                 0, lambda: self._chat_page and self._chat_page.receive_network_message(payload)
+            ),
+        )
+        self.connection_manager.register_callback(
+            "file_meta",
+            lambda payload, peer_id=None: self.after(
+                0, lambda: self._files_page and self._files_page.handle_file_meta(payload, peer_id)
+            ),
+        )
+        self.connection_manager.register_callback(
+            "file_chunk",
+            lambda payload, peer_id=None: self.after(
+                0, lambda: self._files_page and self._files_page.handle_file_chunk(payload, peer_id)
             ),
         )
         self.connection_manager.register_callback(
@@ -330,6 +350,35 @@ class MainWindow(customtkinter.CTk):
                     "metadata": {},
                 }
             )
+
+    def _bind_shortcuts(self) -> None:
+        """Register the global keyboard shortcuts declared in core.constants.SHORTCUTS."""
+        self.bind("<Control-comma>", lambda event: self._navigate_shortcut("settings"))
+        self.bind("<Control-Home>", lambda event: self._navigate_shortcut("dashboard"))
+        self.bind("<Control-l>", lambda event: self._navigate_shortcut("logs"))
+        self.bind("<Control-L>", lambda event: self._navigate_shortcut("logs"))
+        self.bind("<Control-t>", lambda event: self._toggle_theme())
+        self.bind("<Control-T>", lambda event: self._toggle_theme())
+        self.bind("<Control-m>", lambda event: self._minimize_shortcut())
+        self.bind("<Control-M>", lambda event: self._minimize_shortcut())
+        self.bind("<Control-q>", lambda event: self._quit_shortcut())
+        self.bind("<Control-Q>", lambda event: self._quit_shortcut())
+
+    def _navigate_shortcut(self, page_key: str) -> None:
+        """Navigate to a page triggered by a keyboard shortcut."""
+        if self._navigation_manager:
+            self._navigation_manager.show_page(page_key)
+
+    def _minimize_shortcut(self) -> None:
+        """Minimize the window via Ctrl+M."""
+        try:
+            self.iconify()
+        except Exception:
+            pass
+
+    def _quit_shortcut(self) -> None:
+        """Quit the application via Ctrl+Q; run() performs the cleanup."""
+        self.destroy()
 
     def run(self) -> None:
         """Start the application main loop."""
