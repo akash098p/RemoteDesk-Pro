@@ -23,7 +23,7 @@ from core.logger import get_logger
 from core.utils import get_tailscale_ip
 from network.ngrok_integration import NgrokIntegration
 from network.packet_system import PacketSystem
-from network.protocol import MessageType, RemoteDeskMessage
+from network.protocol import MessageFactory, MessageType, RemoteDeskMessage
 
 logger = get_logger()
 
@@ -77,6 +77,9 @@ class ConnectionManager:
             "peer_connected": None,
             "peer_disconnected": None,
             "control_request": None,
+            "file_meta": None,
+            "file_chunk": None,
+            "clipboard": None,
         }
 
         self._mouse_controller = None
@@ -299,6 +302,45 @@ class ConnectionManager:
             "timestamp": time.time(),
         }
         return self._broadcast(RemoteDeskMessage(MessageType.CHAT_MESSAGE, payload))
+
+    def send_file_meta(
+        self,
+        transfer_id: str,
+        file_name: str,
+        file_size: int,
+        action: str = "start",
+        checksum: Optional[str] = None,
+        is_image: bool = False,
+        relative_path: Optional[str] = None,
+    ) -> bool:
+        """Announce the start/completion of a file transfer."""
+        message = MessageFactory.create_file_meta(
+            transfer_id=transfer_id,
+            file_name=file_name,
+            file_size=file_size,
+            action=action,
+            checksum=checksum,
+            is_image=is_image,
+            relative_path=relative_path,
+        )
+        message.payload["sender"] = self.device_name
+        return self._broadcast(message)
+
+    def send_file_chunk(self, transfer_id: str, chunk: bytes, position: int, total: int) -> bool:
+        """Transmit one chunk of a file transfer."""
+        message = MessageFactory.create_file_chunk(
+            transfer_id=transfer_id,
+            chunk=chunk,
+            position=position,
+            total=total,
+        )
+        return self._broadcast(message)
+
+    def send_clipboard_sync(self, content: str) -> bool:
+        """Share clipboard text with the connected peer."""
+        return self._broadcast(
+            MessageFactory.create_clipboard_sync(content=content, sender=self.device_name)
+        )
 
     def send_mouse_event(self, payload: Any = None, **kwargs: Any) -> bool:
         """Send mouse input to the host or connected peers."""
@@ -548,6 +590,21 @@ class ConnectionManager:
             return
         if message.type == MessageType.CONTROL_REQUEST:
             self._handle_control_request(message.payload, peer_id, is_server_side)
+            return
+        if message.type == MessageType.FILE_META:
+            self._emit("file_meta", message.payload, peer_id)
+            if is_server_side:
+                self._relay_to_other_clients(message, peer_id)
+            return
+        if message.type == MessageType.FILE_CHUNK:
+            self._emit("file_chunk", message.payload, peer_id)
+            if is_server_side:
+                self._relay_to_other_clients(message, peer_id)
+            return
+        if message.type == MessageType.CLIPBOARD_SYNC:
+            self._emit("clipboard", message.payload, peer_id)
+            if is_server_side:
+                self._relay_to_other_clients(message, peer_id)
 
     def _relay_to_other_clients(self, message: RemoteDeskMessage, exclude_peer_id: str) -> None:
         packet = PacketSystem.create_packet(message.to_dict())
@@ -644,6 +701,15 @@ class ConnectionManager:
             peer.remote_client_id = payload.get("client_id", peer.remote_client_id)
 
         self._emit("status", self.get_session_summary(), True)
+
+    def get_active_peer_id(self) -> Optional[str]:
+        """Return the peer id of the active session (client peer or first host peer)."""
+        with self._lock:
+            if self._client_peer is not None:
+                return self._client_peer.peer_id
+            for peer_id in self._peers:
+                return peer_id
+        return None
 
     def _ensure_mouse_controller(self):
         if self._mouse_controller is not None:
