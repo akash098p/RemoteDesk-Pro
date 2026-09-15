@@ -9,6 +9,7 @@ Defines the message structure and protocol between clients and servers
 import time
 from enum import Enum
 from dataclasses import dataclass
+import base64
 import json
 from typing import Dict, Any
 
@@ -21,6 +22,9 @@ class MessageType(Enum):
     HEARTBEAT = 5         # Heartbeat message for connection checking
     AUDIO_FRAME = 6       # Audio frame for real-time audio streaming
     CHAT_MESSAGE = 7      # Text chat between peers
+    FILE_META = 8         # File transfer metadata (start / complete / abort)
+    FILE_CHUNK = 9        # File transfer data chunk
+    CLIPBOARD_SYNC = 10   # Clipboard content synchronization
 
 @dataclass
 class RemoteDeskMessage:
@@ -107,3 +111,67 @@ class MessageFactory:
             "data": data
         }
         return RemoteDeskMessage(type=MessageType.CONTROL_REQUEST, payload=payload)
+
+    @staticmethod
+    def create_file_meta(
+        transfer_id: str,
+        file_name: str,
+        file_size: int,
+        action: str = "start",
+        checksum: str = None,
+        is_image: bool = False,
+        relative_path: str = None,
+    ) -> RemoteDeskMessage:
+        """Create a file transfer metadata message.
+
+        Args:
+            transfer_id: Unique identifier shared by every chunk of a transfer
+            file_name: Original file name
+            file_size: Total size of the file in bytes
+            action: One of "start", "complete" or "abort"
+            checksum: Optional checksum of the finished file
+            is_image: True when the payload can be previewed as an image
+            relative_path: Folder-aware path used to rebuild folder transfers
+        """
+        payload = {
+            "transfer_id": transfer_id,
+            "file_name": file_name,
+            "file_size": file_size,
+            "action": action,
+            "checksum": checksum,
+            "is_image": is_image,
+            "relative_path": relative_path or file_name,
+            "timestamp": time.time(),
+        }
+        return RemoteDeskMessage(type=MessageType.FILE_META, payload=payload)
+
+    @staticmethod
+    def create_file_chunk(
+        transfer_id: str,
+        chunk: bytes,
+        position: int,
+        total: int,
+    ) -> RemoteDeskMessage:
+        """Create a file chunk message.
+
+        The raw bytes are base64 encoded so the payload stays JSON serializable,
+        matching how screen frames and audio chunks travel over the socket.
+        """
+        payload = {
+            "transfer_id": transfer_id,
+            "chunk": base64.b64encode(chunk).decode("ascii"),
+            "position": position,
+            "total": total,
+            "timestamp": time.time(),
+        }
+        return RemoteDeskMessage(type=MessageType.FILE_CHUNK, payload=payload)
+
+    @staticmethod
+    def create_clipboard_sync(content: str, sender: str = "") -> RemoteDeskMessage:
+        """Create a clipboard synchronization message"""
+        payload = {
+            "content": content,
+            "sender": sender,
+            "timestamp": time.time(),
+        }
+        return RemoteDeskMessage(type=MessageType.CLIPBOARD_SYNC, payload=payload)
