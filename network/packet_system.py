@@ -71,10 +71,18 @@ class PacketSystem:
             # Extract payload and decode JSON
             payload = data[4:4 + length].decode('utf-8')
             parsed_data = json.loads(payload)
-            
+
             from core.logger import logger
-            logger.info(f"Packet parsed: {parsed_data}")
-            
+            # Keep this at DEBUG: high-frequency payloads (screen frames, audio and
+            # file chunks) would otherwise flood the log file and slow the session.
+            logger.debug(
+                "Packet parsed: type=%s keys=%s",
+                parsed_data.get("type"),
+                sorted(parsed_data.get("payload", {}).keys())
+                if isinstance(parsed_data.get("payload"), dict)
+                else type(parsed_data.get("payload")).__name__,
+            )
+
             return parsed_data
             
         except (struct.error, json.JSONDecodeError) as e:
