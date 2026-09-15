@@ -44,5 +44,12 @@
     "icon_button_text": "#F4F7FB",
     "glass_overlay": "#162235",
     "glass_overlay_alt": "#1C2D47",
-    "glass_highlight": "#223653"
+    "glass_highlight": "#223653",
+    "card_title": "#F4F7FB",
+    "card_footer_text": "#AFC0D6",
+    "error": "#FF6B6B",
+    "error_hover": "#F16B82",
+    "close_button_bg": "#162235",
+    "close_button_hover_bg": "#E85D75",
+    "close_button_text": "#F4F7FB"
 }
