@@ -1,4 +1,9 @@
-# Python
+# Windows artifacts
+desktop.ini
+Thumbs.db
+
+# Local helper scripts
+temp/
 __pycache__/
 *.pyc
 *.pyo
