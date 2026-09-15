@@ -43,12 +43,12 @@ Coming Soon
 
 ## 🖥️ Screen Sharing
 
-- Live desktop streaming
+- Live desktop streaming (verified end-to-end over real TCP sessions)
 - High-quality image compression
 - Adjustable FPS
-- Full-screen mode
+- Cross-network support (LAN + Tailscale Tailnet IP detection)
+- Full-screen mode (planned)
 - Multi-monitor support (planned)
-- Cross-network support
 
 ---
 
@@ -66,22 +66,21 @@ Coming Soon
 
 - Two-way messaging
 - Emoji support 😀
-- Image sharing
-- File sharing
-- Drag & Drop
-- Typing indicator
-- Read status (planned)
+- Image/file attachments
 - Timestamp
+- Read-receipt ticks (local display only)
+- Typing indicator (planned)
 
 ---
 
 ## 📂 File Transfer
 
 - Send files
-- Send folders
-- Drag & Drop
+- Send folders (structure-preserving, content-verified end-to-end)
+- Native drag & drop via tkinterdnd2 (graceful fallback to dialogs)
 - Progress bar
 - Pause / Resume
+- Cancel + abort notification
 - Image preview
 - Download history
 - Save location selection
@@ -90,14 +89,14 @@ Coming Soon
 
 ## 📋 Clipboard Synchronization
 
-- Automatic clipboard sync
-- Text
-- URLs
-- Code snippets
+- Local clipboard manager page (view / copy / clear)
+- Text, URLs and code snippets
+- Network clipboard-sync protocol + background watcher (ready)
+- Automatic UI sync wiring (pending — page currently shows "Remote sync is not configured yet")
 
 ---
 
-## 🎤 Audio Streaming *(Planned)*
+## 🎤 Audio Streaming *(in progress — Screen-page toggle, no dedicated page yet)*
 
 - Microphone streaming
 - Speaker streaming
@@ -111,11 +110,9 @@ Coming Soon
 - Modern CustomTkinter interface
 - Dark Mode
 - Light Mode
-- AMOLED Theme
-- Dracula Theme
-- Nord Theme
-- Custom themes (planned)
+- JSON themes (add more `gui/themes/*.json` to extend)
 - Responsive layout
+- Keyboard-first navigation (Ctrl+, Settings · Ctrl+Home Dashboard · Ctrl+L Logs · Ctrl+T theme · Ctrl+M minimize · Ctrl+Q quit)
 
 ---
 
@@ -124,11 +121,13 @@ Coming Soon
 - Theme selection
 - FPS selection
 - Quality selection
+- Font size
 - Download folder
-- Notifications
-- Hotkeys
+- Notification preferences
 - Language
+- Window settings
 - Auto-connect (planned)
+- Hotkeys (page shortcuts; global shortcuts fixed in code — full remapping UI planned)
 
 ---
 
@@ -156,6 +155,7 @@ Coming Soon
 | System Monitoring | Psutil |
 | Clipboard | Pyperclip |
 | Remote Control | Pynput + PyAutoGUI |
+| Drag & Drop | tkinterdnd2 |
 | Input / Emoji / UX Helpers | Emoji, ScreenInfo, Requests |
 | Audio | SoundDevice / PyAudio *(optional)* |
 | Logging | Python Logging |
@@ -249,39 +249,55 @@ RemoteDesk-Pro/
 ## ✅ Phase 6 — File Transfer
 
 - File Transfer
-- Folder Transfer
+- Folder Transfer (structure-preserving, resume-aware)
+- Native drag & drop via tkinterdnd2
+- Cancel / abort flow
 - Image Preview
 - Download Manager
 - Transfer progress and reliability
+- Incoming-transfers UI wiring
 
 ---
 
-## 🚧 Phase 7 — Remote Control & Session Reliability
+## ✅ Phase 7 — Remote Control & Session Reliability
 
-- Remote Mouse
-- Remote Keyboard
-- Permission System
-- Secure session controls
+- Remote Mouse (permission-gated, pyautogui)
+- Remote Keyboard (permission-gated, pyautogui/pynput)
+- Permission request/grant/deny dialog flow
+- Control-request deep link from Screen page
 - Session cleanup and disconnect handling
+- Connect → Screen auto-navigation
 - Cross-page stability improvements
 
 ---
 
-## 🚧 Phase 8 — Cross-Network Access & Audio
+## ✅ Phase 8 — Cross-Network Access & Audio Foundation
 
-- Public endpoint guidance and tunnel UX
-- Optional live audio dependencies
-- Better host / peer connection flow
+- LAN hosting + connect flow with auto-navigation to Screen
+- Tailscale Tailnet IP auto-detection + in-app guidance (free cross-network path)
+- Saved ngrok token field in Connection page (manual public-tunnel option)
+- Live audio pipeline: sounddevice capture + sender wired to Screen-page toggle
 - Internet-session reliability improvements
 
 ---
 
-## ⏳ Phase 9 — Polishing & Release
+## 🚧 Phase 9 — In Progress
 
-- Performance Optimization
+- Dedicated Audio settings page (`gui/pages/audio.py` is an empty stub)
+- Clipboard page ↔ network sync wiring (protocol + watcher ready, page still local-only)
+- Chat typing indicator + true delivery/read receipts over the wire
+- Screen full-screen mode + multi-monitor selection
+- Settings: auto-connect, full hotkey remapping UI
 - Notifications refinement
-- Packaging and distribution testing
 - Multi-device validation on different networks
+
+---
+
+## ⏳ Phase 10 — Polishing & Release
+
+- Performance optimization
+- Packaging and distribution testing
+- Release hardening
 
 ---
 
@@ -358,23 +374,36 @@ This project is licensed under the MIT License.
 
 # 📅 Current Progress
 
-| Module | Status |
-|---------|--------|
-| Project Structure | ✅ |
-| GUI Foundation | ✅ |
-| Theme Engine | ✅ |
-| Logger | ✅ |
-| Dashboard | ✅ |
-| Navigation / Sidebar UX | ✅ |
-| About Page | ✅ |
-| Networking | 🚧 |
-| Screen Sharing | 🚧 |
-| Remote Control | 🚧 |
-| Chat | ✅ |
-| File Transfer | 🚧 |
-| Clipboard | ✅ |
-| Public Tunnel / Internet Access | 🚧 |
-| Audio | ⏳ |
+*Verified against the codebase — see "How to verify" below.*
+
+| Module | Status | Notes |
+|---------|--------|-------|
+| Project Structure | ✅ | Modular layout stable |
+| GUI Foundation | ✅ | CustomTkinter shell, navigation manager, status bar |
+| Theme Engine | ✅ | JSON themes (dark + light shipped, extensible) |
+| Logger | ✅ | File + console + in-memory buffer for Logs page |
+| Dashboard | ✅ | CPU/RAM, session summary, quick actions |
+| Navigation / Sidebar UX | ✅ | All pages registered; keyboard shortcuts wired |
+| About Page | ✅ | App info |
+| Networking Core | ✅ | Real TCP host/client verified 20/20 in `test_network_phase3.py` |
+| Screen Sharing | ✅ | Live streaming verified end-to-end (FPS/quality controls) |
+| Remote Control | ✅ | Permission-gated mouse/keyboard over active session |
+| Chat | ✅ | Two-way messaging + attachments (typing indicator & true receipts pending) |
+| File Transfer | ✅ | Files + folders with resume/cancel/history, verified end-to-end |
+| Clipboard | 🚧 | Local manager works; network sync protocol ready but page not yet wired |
+| Cross-Network Access | ✅ | LAN + Tailscale guidance; saved tunnel-token field |
+| Audio | 🚧 | Capture + sender pipeline works from Screen-page toggle; no dedicated page yet |
+
+---
+
+## ✅ How to verify
+
+```bash
+venv\Scripts\python.exe test_network_phase3.py   # 20/20 end-to-end network checks
+venv\Scripts\python.exe app.py                   # run the app
+```
+
+Status legend: ✅ working · 🚧 partially working / in progress · ⏳ not started
 
 ---
 
