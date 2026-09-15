@@ -51,6 +51,8 @@ class StreamingServer:
         self._running = False
         self._lock = threading.Lock()
         self._stream_sender_thread: Optional[threading.Thread] = None
+        self._latest_frame: Optional[bytes] = None
+        self._latest_frame_time: float = 0.0
         
     def start(self) -> bool:
         """
@@ -150,18 +152,20 @@ class StreamingServer:
         while self._running:
             try:
                 with self._lock:
-                    if hasattr(self, '_latest_frame'):
+                    frame = self._latest_frame
+                    if frame is not None:
                         for client_id, client_data in list(self._clients.items()):
                             try:
-                                client_data["send_callback"](self._latest_frame)
+                                client_data["send_callback"](frame)
                             except Exception as e:
                                 logger.error(f"Error sending to {client_id}: {e}")
                                 # Remove unresponsive client
                                 del self._clients[client_id]
-                                self._on_client_leave(client_id)
-                
+                                if self._on_client_leave:
+                                    self._on_client_leave(client_id)
+
                 time.sleep(0.01)  # Small sleep to prevent busy loop
-                
+
             except Exception as e:
                 logger.error(f"Stream sender error: {e}")
     
