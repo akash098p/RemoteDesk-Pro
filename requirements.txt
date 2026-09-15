@@ -13,3 +13,4 @@ pywinstyles==1.8
 PyYAML==6.0.3
 requests==2.32.4
 screeninfo==0.8.1
+tkinterdnd2==0.4.2
