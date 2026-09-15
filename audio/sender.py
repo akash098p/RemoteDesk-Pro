@@ -12,7 +12,13 @@ import queue
 import logging
 from typing import Optional, Callable
 
-import pyaudio
+# PyAudio is an optional dependency (see requirements-audio-optional.txt).
+# Import it lazily so that this module can always be imported and the caller
+# can degrade gracefully when live audio is unavailable.
+try:  # pragma: no cover - depends on the local environment
+    import pyaudio
+except ImportError:  # pragma: no cover - depends on the local environment
+    pyaudio = None
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +64,12 @@ class AudioSender:
             return True
         
         try:
+            if pyaudio is None:
+                raise RuntimeError(
+                    "PyAudio is not installed. Install the optional audio "
+                    "requirements (requirements-audio-optional.txt) to enable live audio."
+                )
+
             self._audio = pyaudio.PyAudio()
             
             # Find default input device
