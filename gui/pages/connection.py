@@ -442,9 +442,17 @@ class ConnectionPage(ctk.CTkFrame):
             for worker in workers:
                 worker.join()
 
-            self.after(0, lambda: self._update_device_list(sorted(found_devices)))
+            try:
+                self.after(0, lambda: self._update_device_list(sorted(found_devices)))
+            except Exception:
+                # Widget already destroyed (app closed during the scan).
+                pass
         except Exception as exc:
-            self.after(0, lambda: self._scan_error(str(exc)))
+            try:
+                self.after(0, lambda: self._scan_error(str(exc)))
+            except Exception:
+                # Widget already destroyed (app closed during the scan).
+                pass
 
     def _update_device_list(self, devices: list[str]) -> None:
         for widget in self.device_scroll.winfo_children():
