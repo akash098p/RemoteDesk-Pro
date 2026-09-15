@@ -149,6 +149,13 @@ class Sidebar(customtkinter.CTkFrame):
                 "icon_size": 24
             },
             {
+                "key": "files",
+                "icon": "folder.png",
+                "text": "Files",
+                "hover_text": "File Transfer",
+                "icon_size": 24
+            },
+            {
                 "key": "clipboard",
                 "icon": "clipboard.png",
                 "text": "Clipboard",
