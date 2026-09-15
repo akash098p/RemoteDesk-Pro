@@ -179,3 +179,23 @@ class StreamingClient:
     def destroy(self) -> None:
         """Clean up resources."""
         self.stop()
+
+
+def create_streaming_client(
+    display_widget: Optional[customtkinter.CTkLabel] = None,
+    on_frame_received: Optional[Callable[[Image.Image], None]] = None,
+) -> StreamingClient:
+    """
+    Create a StreamingClient instance.
+
+    Args:
+        display_widget: CTkLabel widget used to display incoming frames
+        on_frame_received: Callback invoked with each decoded PIL frame
+
+    Returns:
+        Configured StreamingClient instance
+    """
+    return StreamingClient(
+        display_widget=display_widget,
+        on_frame_received=on_frame_received,
+    )
