@@ -84,7 +84,6 @@ class ShortcutManager:
         self.register_shortcut(
             id="rc_lock_kb",
             name="Lock Keyboard",
-            keys",
             keys=["ctrl", "alt", "k"],
             action=self._lock_keyboard,
             description="Temporarily disable remote keyboard input",
