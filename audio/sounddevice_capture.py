@@ -12,8 +12,15 @@ import queue
 import logging
 from typing import Optional, Callable
 
-import sounddevice as sd
-import numpy as np
+# SoundDevice and NumPy are optional dependencies (see
+# requirements-audio-optional.txt). Import them lazily so this module can always
+# be imported and the caller can degrade gracefully when audio is unavailable.
+try:  # pragma: no cover - depends on the local environment
+    import sounddevice as sd
+    import numpy as np
+except ImportError:  # pragma: no cover - depends on the local environment
+    sd = None
+    np = None
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +61,12 @@ class SoundDeviceCapture:
             return True
         
         try:
+            if sd is None or np is None:
+                raise RuntimeError(
+                    "SoundDevice/NumPy are not installed. Install the optional audio "
+                    "requirements (requirements-audio-optional.txt) to enable live audio."
+                )
+
             self._stream = sd.InputStream(
                 samplerate=self.rate,
                 channels=self.channels,
